@@ -104,7 +104,7 @@ export default function Header({ chat }: { chat?: boolean }) {
       text: "Profile",
       icon: <Person />,
       color: theme.palette.primary.main,
-      link: "/profile",
+      link: "/in/" + (user ? user.username : ""),
     },
     {
       text: "New Chat",
@@ -167,7 +167,7 @@ export default function Header({ chat }: { chat?: boolean }) {
             <BottomNavigationAction
               label="Profile"
               icon={<Person />}
-              href={`/in/${user.name}`}
+              href={`/in/${user.username}`}
             />
             <BottomNavigationAction label="Add" icon={<Add />} />
             <BottomNavigationAction label="More" icon={<MenuIcon />} />

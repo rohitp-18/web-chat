@@ -57,6 +57,30 @@ const findUsers = createAsyncThunk("user/findUsers", async (word: string) => {
   }
 });
 
+const logoutUser = createAsyncThunk("user/logoutUser", async () => {
+  try {
+    await axios.get("/user/logout");
+  } catch (error) {
+    handleError(error);
+  }
+});
+
+const updateUserProfile = createAsyncThunk(
+  "user/updateUserProfile",
+  async (formData: FormData) => {
+    try {
+      const { data } = await axios.put("/user/update", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return data;
+    } catch (error) {
+      handleError(error);
+    }
+  }
+);
+
 interface UserState {
   profile?: user;
   user: user | null;
@@ -157,11 +181,35 @@ const userSlice = createSlice({
       })
 
       .addCase(getUserProfile.fulfilled, (state, action) => {
-        state.profile = action.payload.profile;
+        state.profile = action.payload.user;
       })
       .addCase(getUserProfile.rejected, (state, action) => {
         console.log(action.error.message, action.payload);
         state.error = action.error.message || "Internal Error";
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.user = null;
+        state.isAuthenticated = false;
+      })
+      .addCase(logoutUser.rejected, (state, action) => {
+        state.error = action.error.message || "Internal Error";
+      })
+
+      .addCase(updateUserProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.success = false;
+      })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.success = true;
+        state.isAuthenticated = true;
+      })
+      .addCase(updateUserProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Internal Error";
+        state.success = false;
       });
   },
 });
@@ -176,6 +224,8 @@ export {
   getUserProfile,
   clearErrors,
   clearSuccess,
+  logoutUser,
+  updateUserProfile,
 };
 
 export default userSlice.reducer;

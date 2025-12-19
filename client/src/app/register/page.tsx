@@ -7,6 +7,7 @@ import Link from "next/link";
 import { AppDispatch, RootState } from "@/store/store";
 import { useRouter } from "next/navigation";
 import { registerUser } from "@/store/userSlice";
+import { toast } from "sonner";
 
 const Register = () => {
   const [name, setName] = useState("");
@@ -23,7 +24,7 @@ const Register = () => {
     e.preventDefault();
 
     if (!email && !password && !name) {
-      alert("please fill all fields");
+      toast.error("Please fill all fields", { position: "top-center" });
       return;
     }
 
@@ -31,13 +32,13 @@ const Register = () => {
   };
   useEffect(() => {
     if (success) {
-      alert("registered successfully");
+      toast.success("Registered successfully", { position: "top-center" });
       dispatch(clearSuccess());
       router.push("/chat");
       return;
     }
     if (error) {
-      alert(error);
+      toast.error(error, { position: "top-center" });
       dispatch(clearErrors());
     }
   }, [dispatch, success, error, router]);

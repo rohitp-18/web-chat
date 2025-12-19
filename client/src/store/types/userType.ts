@@ -7,9 +7,10 @@ interface user {
     url: string;
     public_id: string;
   };
-  bio?: string;
+  about?: string;
   username: string;
   website?: { text: string; url: string };
+  createdAt: Date;
 }
 
 export type { user };

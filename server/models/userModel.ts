@@ -6,6 +6,8 @@ interface IUser extends mongoose.Document {
   name: string;
   email: string;
   password: string;
+  username: string;
+  about: string;
   avatar: { url: string; public_id: string } | null;
   comparePassword(password: string): Promise<boolean>;
 }
@@ -20,6 +22,14 @@ const userSchema = new mongoose.Schema<IUser>({
     required: [true, "Please enter your email"],
     validate: validator.isEmail,
     unique: [true, "Email already exists"],
+  },
+  about: {
+    type: String,
+  },
+  username: {
+    type: String,
+    required: [true, "Please enter your username"],
+    unique: [true, "Username already exists"],
   },
   password: {
     type: String,

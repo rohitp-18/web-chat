@@ -16,10 +16,18 @@ function AllChats() {
   );
   const { user } = useSelector((state: RootState) => state.user);
   const dispatch = useDispatch();
-  const { onlineUser } = useSocket();
+  const { onlineUser, socket } = useSocket();
 
   const chatOpen = (item: chat) => {
     dispatch(setChat(item));
+    if (socket) {
+      socket.emit("all_read_message", {
+        chatId: item._id,
+        message: item.latestMessage,
+        userId: item.latestMessage?.sender._id,
+        senderId: user?._id,
+      });
+    }
   };
 
   if (!chats || !user) {
@@ -60,13 +68,16 @@ function AllChats() {
   return (
     <div className="w-full md:min-w-[320px] md:max-w-[400px] bg-white rounded-none md:rounded-lg shadow-none md:shadow-lg p-3 md:p-4 h-full overflow-hidden">
       <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
-        <span className="font-bold text-xl md:text-2xl text-gray-800">
+        <span className="font-bold text-base md:text-lg text-gray-800">
           Chats
         </span>
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setGroup(true)}
-            className="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-md"
+            className="p-2 rounded-full text-white hover:shadow-lg transition-all shadow-md"
+            style={{
+              background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+            }}
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path
@@ -88,13 +99,15 @@ function AllChats() {
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            <span className="ml-2 text-gray-500">Loading chats...</span>
+            <span className="ml-2 text-xs text-gray-500">Loading chats...</span>
           </div>
         ) : !chats || chats.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-gray-400 text-4xl mb-3">💬</div>
-            <div className="text-gray-400 font-medium">No chats available</div>
-            <div className="text-gray-300 text-sm mt-1">
+            <div className="text-gray-400 text-2xl mb-3">💬</div>
+            <div className="text-gray-400 font-medium text-sm">
+              No chats available
+            </div>
+            <div className="text-gray-300 text-xs mt-1">
               Start a new conversation
             </div>
           </div>
@@ -111,7 +124,7 @@ function AllChats() {
               <div
                 onClick={() => chatOpen(item)}
                 key={item._id}
-                className={`flex items-center p-3 rounded-xl cursor-pointer hover:bg-linear-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 border border-transparent hover:border-blue-100 group ${
+                className={`flex items-center p-1.5 rounded-xl cursor-pointer hover:bg-linear-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 border border-transparent hover:border-blue-100 group ${
                   chat && chat._id === item._id ? "bg-gray-100" : ""
                 }`}
               >
@@ -122,7 +135,7 @@ function AllChats() {
                         width: { xs: 40, md: 48 },
                         height: { xs: 40, md: 48 },
                         background:
-                          "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                          "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
                         fontSize: { xs: "1rem", md: "1.2rem" },
                       }}
                     >
@@ -132,19 +145,19 @@ function AllChats() {
                     </Avatar>
                     {!item.isGroup &&
                       otherUser &&
-                      !onlineUser.includes(otherUser?._id) && (
+                      onlineUser.has(otherUser?._id) && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
                       )}
                   </div>
                   <div className="flex flex-col min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-gray-800 truncate text-sm md:text-base group-hover:text-blue-700 transition-colors">
+                      <span className="font-semibold text-gray-800 truncate text-xs md:text-sm group-hover:text-blue-700 transition-colors">
                         {item.isGroup
                           ? item.chatName
                           : otherUser?.name || "Unknown"}
                       </span>
                       {latestMessage && (
-                        <span className="text-xs text-gray-400 ml-2 hidden sm:block">
+                        <span className="text-[10px] text-gray-400 ml-2 hidden sm:block">
                           {new Date(
                             latestMessage.createdAt
                           ).toLocaleDateString()}
@@ -153,13 +166,16 @@ function AllChats() {
                     </div>
                     {latestMessage && (
                       <div className="flex items-center justify-between mt-1">
-                        <span className="text-xs md:text-sm text-gray-500 truncate max-w-[180px] md:max-w-[220px]">
+                        <span className="text-xs md:text-xs text-gray-500 truncate max-w-[180px] md:max-w-[220px]">
                           {item.isGroup && latestMessage.sender
                             ? `${latestMessage.sender.name}: `
                             : ""}
                           {latestMessage.content}
                         </span>
-                        <div className="ml-2 w-2 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        {item._id !== chat?._id &&
+                          !item.latestMessage?.read.includes(user._id) && (
+                            <div className="ml-2 w-2 h-2 bg-blue-500 rounded-full opacity-100 transition-opacity"></div>
+                          )}
                       </div>
                     )}
                   </div>

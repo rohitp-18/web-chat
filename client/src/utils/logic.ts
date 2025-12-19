@@ -10,16 +10,21 @@ const isSameSenderMargin = (
     i < messages.length - 1 &&
     messages[i + 1].sender._id === m.sender._id &&
     messages[i].sender._id !== userId
-  )
+  ) {
+    if (isNewDay(messages, i + 1)) {
+      return 0;
+    }
     return 40;
-  else if (
+  } else if (
     (i < messages.length - 1 &&
       messages[i + 1].sender._id !== m.sender._id &&
       messages[i].sender._id !== userId) ||
     (i === messages.length - 1 && messages[i].sender._id !== userId)
   )
     return 0;
-  else return "auto";
+  else if (messages[i].sender._id === userId) {
+    return 0;
+  } else return "auto";
 };
 
 const isSameSender = (
@@ -48,4 +53,21 @@ const isSameUser = (messages: Message[], m: Message, i: number) => {
   return i > 0 && messages[i - 1].sender._id === m.sender._id;
 };
 
-export { isSameSender, isSameUser, isLastMessage, isSameSenderMargin };
+const isNewDay = (messages: Message[], i: number) => {
+  if (i === 0) return true;
+  const currentMessageDate = new Date(messages[i].createdAt);
+  const previousMessageDate = new Date(messages[i - 1].createdAt);
+  return (
+    currentMessageDate.getDate() !== previousMessageDate.getDate() ||
+    currentMessageDate.getMonth() !== previousMessageDate.getMonth() ||
+    currentMessageDate.getFullYear() !== previousMessageDate.getFullYear()
+  );
+};
+
+export {
+  isSameSender,
+  isSameUser,
+  isLastMessage,
+  isSameSenderMargin,
+  isNewDay,
+};

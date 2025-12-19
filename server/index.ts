@@ -11,12 +11,27 @@ import error from "./middlewares/error";
 import chat from "./routers/chatRouter";
 import setupSocket from "./socket";
 import { createServer } from "http";
+import morgan from "morgan";
+import { v2 as cloudinary } from "cloudinary";
+import webpush from "web-push";
 
 dotenv.config({ path: path.resolve(__dirname, "./config/.env") });
 
 mongodb();
 
 const app = express();
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_KEY,
+  api_secret: process.env.CLOUDINARY_SECRET,
+});
+
+webpush.setVapidDetails(
+  "mailto:your@email.com",
+  process.env.VAPID_PUBLIC_KEY || "",
+  process.env.VAPID_PRIVATE_KEY || ""
+);
 
 const http = createServer(app);
 
@@ -32,6 +47,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(morgan("dev"));
 
 app.use("/api/v1/user", user);
 app.use("/api/v1/chats", chat);

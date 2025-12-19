@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@theme {
+  --breakpoint-md: 800px;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -110,6 +114,19 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* highlight message interface using tailwind css */
+@keyframes highlight {
+  0% {
+    background-color: var(--card);
+  }
+  50% {
+    background-color: transparent;
+  }
+  100% {
+    background-color: var(--card);
+  }
 }
 
 @layer base {

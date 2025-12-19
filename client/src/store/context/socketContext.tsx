@@ -4,7 +4,6 @@ import React, {
   useContext,
   ReactNode,
   useEffect,
-  useCallback,
 } from "react";
 import { io, Socket } from "socket.io-client";
 import { AppDispatch, RootState } from "../store";
@@ -19,7 +18,7 @@ import { toast } from "sonner";
 // import CustomNotification from "../../components/customNotification";
 import { chat, Message } from "../types/chatType";
 import { user } from "../types/userType";
-import { updateChats } from "../chatSlice";
+import { getAllChats, toggleBlockChat, updateChats } from "../chatSlice";
 
 interface SocketState {
   isConnected: boolean;
@@ -35,7 +34,7 @@ interface SocketContextProps extends SocketState {
   setSelectedChat: (chat: chat | null) => void;
   selectedUser: user | null;
   setSelectedUser: (user: user | null) => void;
-  onlineUser: string[];
+  onlineUser: Set<string>;
 }
 
 const initialState: SocketState = {
@@ -53,22 +52,23 @@ const SocketContext = createContext<SocketContextProps>({
   setSelectedChat: () => {},
   selectedUser: null,
   setSelectedUser: () => {},
-  onlineUser: [],
+  onlineUser: new Set(),
 });
 
 export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<SocketState>(initialState);
   const [selectedUser, setSelectedUser] = useState<user | null>(null);
   const [selectedChat, setSelectedChat] = useState<chat | null>(null);
-  const [onlineUser, setOnlineUsers] = useState<string[]>([]);
-  const [getOnlineUser, setGetOnlineUsers] = useState(false);
+  const [onlineUser, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [chatCount, setChatCount] = useState(0);
   // const [show, setShow] = useState(false);
   // const [notificationData, setNotificationData] =
   //   useState<notificationT | null>(null);
 
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.user);
-  const { chats } = useSelector((state: RootState) => state.chat);
+  const { chats, chat } = useSelector((state: RootState) => state.chat);
   // const { totalChats, totalInvitations, totalNotifications } = useSelector(
   //   (state: RootState) => state.notification
   // );
@@ -94,29 +94,15 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const checkOnlineUser = useCallback(() => {
-    console.log("online users");
-    if (state.socket && user) {
-      state.socket.emit("check_online_users", {
-        users: [
-          ...chats
-            .filter((c) => !c.isGroup)
-            .map((c) =>
-              c.users[0]._id === user._id ? c.users[1]._id : c.users[0]._id
-            ),
-          user._id,
-        ],
-      });
-    }
-  }, [state, user, chats]);
-
   useEffect(() => {
     if (!user) return;
-    if (state.socket) return;
+    if (socket) return;
     const newSocket = io("ws://localhost:5000", {
       query: { selectedUser: user._id },
       transports: ["websocket"],
     });
+
+    setSocket(newSocket);
     newSocket.connect();
     newSocket.on("connect", () => {
       newSocket.emit("register_user", user._id);
@@ -125,12 +111,49 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
     newSocket.on("disconnect", () => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, state.socket]);
+  }, [user, socket]);
+
+  // handle user going offline on window close
+  useEffect(() => {
+    if (!socket || !user) return;
+
+    const handleBeforeUnload = () => {
+      socket.emit("user_going_offline", { userId: user._id, onlineUser });
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [socket, user, onlineUser]);
+
+  // handle user going offline on tab switch
+  useEffect(() => {
+    if (!socket || !user) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        socket.emit("user_going_offline", { userId: user._id, onlineUser });
+        setOnlineUsers(new Set());
+        socket.disconnect();
+        setChatCount(0);
+        setState((prev) => ({ ...prev, socket: null, isConnected: false }));
+      } else {
+        socket.connect();
+        dispatch(getAllChats());
+        setState((prev) => ({ ...prev, socket, isConnected: true }));
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [socket, user, onlineUser, dispatch]);
 
   // handle new messages
   useEffect(() => {
-    if (!user || !state.socket) return;
-    const { socket } = state;
+    if (!user || !socket) return;
 
     socket.on("message received", handleNewMessage);
 
@@ -138,48 +161,84 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
       socket.off("message received", handleNewMessage);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, state.socket, selectedChat]);
+  }, [user, socket, selectedChat]);
 
+  //check online users whenever chats change
   useEffect(() => {
-    const { socket } = state;
-    console.log(chats.length, socket);
-    if (chats.length > 0 && !getOnlineUser && socket && user) {
-      checkOnlineUser();
+    if (chats.length > 0 && chats.length !== chatCount && socket && user) {
+      setChatCount(chats.length);
+      socket.emit("check_online_users", {
+        users: [
+          ...chats
+            .filter((c) => !c.isGroup)
+            .map((c) =>
+              c.users[0]._id === user._id ? c.users[1]._id : c.users[0]._id
+            ),
+        ],
+        sender: user._id,
+      });
     }
-  }, [getOnlineUser, chats, checkOnlineUser, state, state.socket, user]);
+  }, [chats, socket, user, chatCount]);
 
+  //initial online users
   useEffect(() => {
-    console.log("line 47");
-    const { socket } = state;
     if (socket && user) {
       socket.on("online_users", (data: { onlineUserIds: string[] }) => {
-        setOnlineUsers(data.onlineUserIds);
-        setGetOnlineUsers(true);
-        console.log(data);
-        socket.emit("check_online_users", {
-          users: [data.onlineUserIds[data.onlineUserIds.length - 1]],
+        setOnlineUsers(new Set(data.onlineUserIds));
+      });
+    }
+  }, [socket, state, user, chats, chatCount]);
+
+  //new online user
+  useEffect(() => {
+    if (socket && user) {
+      socket.on("new_online_users", (data: { sender: string }) => {
+        setOnlineUsers((prev) => {
+          prev.add(data.sender);
+          return new Set(prev);
         });
       });
     }
-  }, [state.socket, state, user]);
+  }, [onlineUser, socket, state, user]);
+
+  //offline users
+  useEffect(() => {
+    if (socket && user) {
+      socket.on("new_offline_users", (data: { sender: string }) => {
+        console.log("new_offline users", data.sender);
+        setOnlineUsers((prev) => {
+          prev.delete(data.sender);
+          return new Set(prev);
+        });
+      });
+    }
+  }, [onlineUser, socket, state, user]);
 
   useEffect(() => {
-    if (state.socket) state.socket.on("registered", () => checkOnlineUser());
-  }, [state.socket, checkOnlineUser]);
+    if (socket && user) {
+      socket.on("registered", () => {});
+    }
+  }, [socket, user, chats]);
 
   useEffect(() => {
     console.log(onlineUser);
   }, [onlineUser]);
 
-  // useEffect(() => {
-  //   if (show && notificationData) {
-  //     const timer = setTimeout(() => {
-  //       setShow(false);
-  //       setNotificationData(null);
-  //     }, 5000);
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [show, notificationData]);
+  useEffect(() => {
+    if (socket) {
+      socket.on("user_blocked", (data) => {
+        dispatch(toggleBlockChat(data));
+      });
+    }
+  }, [socket, dispatch]);
+
+  useEffect(() => {
+    if (socket) {
+      socket.on("user_unblocked", (data) => {
+        dispatch(toggleBlockChat(data));
+      });
+    }
+  }, [socket, dispatch]);
 
   return (
     <SocketContext.Provider

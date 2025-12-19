@@ -7,23 +7,6 @@ let io: Server;
 function setupSocket(server: HttpServer): void {
   onlineUsers = new Map<string, string>();
 
-  // const io = require("socket.io")(server, {
-  //   pingTimeout: 60000,
-  //   cors: "http://localhost:3000/",
-  // });
-
-  // io.on("connection", (socket: any) => {
-  //   socket.on("setup", (data: { _id: string }) => {
-  //     socket.join(data._id);
-  //     socket.emit("connected");
-  //   });
-
-  //   socket.on("register_user", (data: string) => {
-  //     socket.join(data);
-  //   });
-
-  // });
-
   io = new Server(server, {
     pingTimeout: 60000,
     cors: {
@@ -42,16 +25,20 @@ function setupSocket(server: HttpServer): void {
     socket.on("register_user", (userId: string) => {
       onlineUsers.set(userId, socket.id);
       socket.join(userId);
-      console.log(userId);
-      socket.to(userId).emit("registered");
+      socket.emit("registered", { success: true, userId });
     });
 
-    socket.on("typing", ({ chat, user }: { chat: string; user: string }) => {
-      socket.in(chat).emit("typing", user);
-    });
+    socket.on(
+      "typing",
+      ({ receiver, user }: { receiver: string; user: string }) => {
+        socket.to(receiver).emit("typing", user);
+      }
+    );
 
-    socket.on("stop typing", ({ chat, user }: { chat: string; user: string }) =>
-      socket.in(chat).emit("stop typing", user)
+    socket.on(
+      "stop typing",
+      ({ receiver, user }: { receiver: string; user: string }) =>
+        socket.to(receiver).emit("stop typing", user)
     );
 
     socket.on("new message", (data: any) => {
@@ -61,22 +48,23 @@ function setupSocket(server: HttpServer): void {
       });
     });
 
-    socket.on("check_online_users", ({ users }: { users: string[] }) => {
-      const onlineUserIds = users.filter((user: string) =>
-        onlineUsers.has(user)
-      );
-      console.log(users, onlineUserIds, onlineUsers);
+    socket.on(
+      "check_online_users",
+      ({ users, sender }: { users: string[]; sender: string }) => {
+        const onlineUserIds = users.filter((user: string) =>
+          onlineUsers.has(user)
+        );
 
-      onlineUserIds.map((u: string) =>
-        socket.to(u).emit("online_users", {
-          onlineUserIds,
-          sender: users[users.length - 1],
-        })
-      );
-      socket
-        .to(users[users.length - 1])
-        .emit("online_users", { onlineUserIds });
-    });
+        if (sender) {
+          onlineUserIds.map((u: string) =>
+            socket.to(u).emit("new_online_users", {
+              sender,
+            })
+          );
+        }
+        socket.emit("online_users", { onlineUserIds });
+      }
+    );
 
     socket.on("read_message", (data: any) => {
       socket.to(data.userId).emit("message_read", data);
@@ -85,6 +73,20 @@ function setupSocket(server: HttpServer): void {
     socket.on("all_read_messages", (data: any) => {
       socket.to(data.userId).emit("all_messages_read", data);
     });
+
+    socket.on(
+      "user_going_offline",
+      (data: { userId: string; onlineUser: Set<string> }) => {
+        console.log(data, "user going offline");
+        const { userId, onlineUser } = data;
+        const socketIds = [...onlineUsers.values()];
+        for (const uid of socketIds) {
+          socket.to(uid).emit("new_offline_users", {
+            sender: userId,
+          });
+        }
+      }
+    );
 
     socket.on("disconnect", () => {
       onlineUsers.forEach((socketId, userId) => {
@@ -99,6 +101,22 @@ function setupSocket(server: HttpServer): void {
       const { userId, notification } = data;
       if (onlineUsers.has(userId)) {
         io.to(userId).emit("receive_notification", notification);
+      }
+    });
+
+    // block chat
+    socket.on("block user", (data: any) => {
+      const { userId, blockedBy, chatId } = data;
+      if (onlineUsers.has(userId)) {
+        io.to(userId).emit("user_blocked", { blockedBy, chatId });
+      }
+    });
+
+    // unblock chat
+    socket.on("unblock user", (data: any) => {
+      const { userId } = data;
+      if (onlineUsers.has(userId)) {
+        io.to(userId).emit("user_unblocked", data);
       }
     });
   });

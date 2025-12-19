@@ -14,12 +14,28 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Chat",
     },
+    parentMessage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedContent: {
+      type: String,
+      select: false,
+    },
     read: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+    isInfoMessage: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

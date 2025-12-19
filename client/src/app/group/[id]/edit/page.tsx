@@ -1,6 +1,7 @@
 "use client";
 
 import ProtectRoute from "@/components/ProtectRoute";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,8 @@ import { Edit } from "@mui/icons-material";
 import { isAxiosError } from "axios";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import React, { useCallback, useRef, useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 
@@ -29,12 +30,14 @@ function Page() {
   const [availableLoading, setAvailableLoading] = useState(false);
 
   const { user } = useSelector((root: RootState) => root.user);
-  const { loading, success, error } = useSelector(
+  const { chat, loading, success, error } = useSelector(
     (root: RootState) => root.chat
   );
+
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const ref = useRef<HTMLInputElement>(null);
+  const { id } = useParams();
 
   const availabilityCheck = async () => {
     if (username === user?.username) {
@@ -61,7 +64,7 @@ function Page() {
     setAvailableLoading(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (availableUsername && username !== availableUsername && !available) {
@@ -85,27 +88,6 @@ function Page() {
     if (newAvatar) {
       formData.append("avatar", newAvatar);
     }
-
-    try {
-      const { data } = await axios.post("/chat/create-group", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      toast.success("Group created successfully", {
-        position: "top-center",
-      });
-      router.push(`/group/${data.groupId}`);
-    } catch (error: unknown) {
-      toast.error(
-        isAxiosError(error)
-          ? error.response?.data.message
-          : "An unexpected error occurred",
-        {
-          position: "top-center",
-        }
-      );
-    }
   };
 
   const uploadAvatar = useCallback(
@@ -124,10 +106,32 @@ function Page() {
   );
 
   useEffect(() => {
+    if (chat && user && chat.chatUsername !== id) {
+      if (chat.admin._id !== user._id) {
+        toast.error("You are not authorized to edit this group", {
+          position: "top-center",
+        });
+        router.push(`/group/${id}`);
+      }
+    }
+  }, [chat, id, router, user]);
+
+  useEffect(() => {
+    if (chat) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setName(chat.chatName || "");
+      setUsername(chat.chatUsername || "");
+      setAbout(chat.about || "");
+      setAvatarPreview(chat.avatar?.url || null);
+    }
+  }, [chat]);
+
+  useEffect(() => {
     if (success) {
-      toast.success("Group created successfully", {
+      toast.success("Group details updated successfully", {
         position: "top-center",
       });
+      router.push(`/group/${id}`);
       dispatch(clearSuccess());
     }
     if (error) {
@@ -136,7 +140,7 @@ function Page() {
       });
       dispatch(clearErrors());
     }
-  }, [success, error, dispatch]);
+  }, [success, router, username, error, dispatch, id]);
 
   if (!user) {
     return (
@@ -148,34 +152,40 @@ function Page() {
 
   return (
     <ProtectRoute>
-      <Link href="/group" className="text-blue-500 hover:underline">
-        &larr; Back to Groups
+      <Link href={`/group/${id}`} className="text-blue-500 hover:underline">
+        &larr; Back to Group
       </Link>
       <div className="max-w-xl mx-auto px-4 py-8">
         <div className="mb-8 flex justify-center items-center flex-col text-center">
-          <h1 className="text-2xl font-bold mb-1">Create New Group</h1>
-          <p className="text-gray-500">Start a new group conversation</p>
+          <h1 className="text-2xl font-bold mb-1">Edit Group Details</h1>
+          <p className="text-gray-500">Update your Group information</p>
         </div>
 
         <form className="space-y-6" onSubmit={handleSubmit}>
           {/* Avatar Section */}
           <div className="flex justify-center flex-col gap-4">
-            <Label className="text-lg font-semibold">Group Picture</Label>
+            <Label className="text-lg font-semibold">Profile Picture</Label>
             <div className="flex items-center justify-center flex-col gap-4">
               <div className="relative" onClick={() => ref.current?.click()}>
                 <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200 hover:shadow-sm cursor-pointer">
-                  {avatarPreview ? (
+                  {!newAvatar && !avatarPreview ? (
+                    <Avatar className="w-full h-full">
+                      <AvatarImage src={user?.avatar?.url} alt={user?.name} />
+                      <AvatarFallback className="text-2xl bg-gray-100">
+                        {user?.name?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : (
                     <Image
-                      src={avatarPreview}
+                      src={
+                        avatarPreview ||
+                        (newAvatar ? URL.createObjectURL(newAvatar) : "")
+                      }
                       alt="Avatar Preview"
                       width={96}
                       height={96}
                       className="w-full h-full object-cover"
                     />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400">
-                      {name?.charAt(0)?.toUpperCase() || "G"}
-                    </div>
                   )}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30 rounded-full">
                     <Edit className="text-white" />
@@ -189,7 +199,7 @@ function Page() {
                   className="cursor-pointer"
                   onClick={() => ref.current?.click()}
                 >
-                  Upload Group Photo
+                  Upload Photo
                 </Button>
                 <input
                   type="file"
@@ -207,14 +217,14 @@ function Page() {
           {/* Name Section */}
           <div className="flex justify-center flex-col gap-4">
             <Label htmlFor="name" className="text-lg font-semibold">
-              Group Name
+              Full Name
             </Label>
             <Input
               type="text"
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter group name"
+              placeholder="Enter your name"
               className="text-base"
               maxLength={50}
             />
@@ -222,7 +232,7 @@ function Page() {
 
           <div className="flex justify-center flex-col gap-4">
             <Label htmlFor="username" className="text-lg font-semibold">
-              Group Handle
+              Username
             </Label>
             <div className="flex w-full sm:flex-row flex-col items-center gap-2">
               <Input
@@ -230,7 +240,7 @@ function Page() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter group handle"
+                placeholder="Enter your username"
                 className="text-base bg-gray-100"
                 maxLength={30}
               />
@@ -261,13 +271,13 @@ function Page() {
 
           <div className="flex justify-center flex-col gap-4">
             <Label htmlFor="about" className="text-lg font-semibold">
-              Description
+              About
             </Label>
             <Textarea
               id="about"
               value={about}
               onChange={(e) => setAbout(e.target.value)}
-              placeholder="Describe the group's purpose"
+              placeholder="Tell us about yourself"
               className="text-base"
               maxLength={160}
               rows={4}
@@ -281,7 +291,7 @@ function Page() {
               disabled={loading}
               className="bg-blue-500 hover:bg-blue-600 px-8"
             >
-              Create Group
+              Save Changes
             </Button>
             <Button
               type="button"

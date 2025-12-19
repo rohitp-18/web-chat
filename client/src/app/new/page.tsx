@@ -1,7 +1,7 @@
 import Header from "@/components/Header";
 import ProtectRoute from "@/components/ProtectRoute";
 import { Button } from "@/components/ui/button";
-import { Group, Person, Search } from "@mui/icons-material";
+import { Group, Person } from "@mui/icons-material";
 import Link from "next/link";
 import React from "react";
 

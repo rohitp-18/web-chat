@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { toast } from "sonner";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -22,7 +23,7 @@ const Login = () => {
   const loginHandler = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!email && !password) {
-      alert("please fill all fields");
+      toast.error("Please fill all fields", { position: "top-center" });
       return;
     }
 
@@ -31,13 +32,13 @@ const Login = () => {
 
   useEffect(() => {
     if (success) {
-      alert("login successfully");
+      toast.success("Logged in successfully", { position: "top-center" });
       dispatch(clearSuccess());
       router.push("/chat");
       return;
     }
     if (error) {
-      alert(error);
+      toast.error(error, { position: "top-center" });
       dispatch(clearErrors());
     }
   }, [dispatch, success, error, router]);
