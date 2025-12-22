@@ -1,3 +1,4 @@
+import { sGroup } from "./groupType";
 import { user } from "./userType";
 
 interface Message {
@@ -8,6 +9,7 @@ interface Message {
   read: string[];
   parentMessage?: Message;
   isDeleted: boolean;
+  users: string[];
   deletedContent?: string;
   isInfoMessage: boolean;
   createdAt: Date;
@@ -20,19 +22,18 @@ interface chat {
   isGroup: boolean;
   users: user[];
   latestMessage?: Message;
-  admin: user;
   createdAt: Date;
   avatar?: {
     url: string;
     public_id: string;
   };
+  group: sGroup | null;
   chatUsername: string;
+  oldUsers: string[];
   about?: string;
   updatedAt: Date;
   blockedBy: user | null;
   blockedAt: Date | null;
-  blockedChatUsers: user[];
-  adminBlockedUsers: user[];
   blockedChat: boolean;
 }
 

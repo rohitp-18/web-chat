@@ -60,58 +60,13 @@ const unblockChat = createAsyncThunk(
   }
 );
 
-const leaveGroup = createAsyncThunk(
-  "chat/leaveGroup",
+const readAllMessage = createAsyncThunk(
+  "chat/readAllMessage",
   async (chatId: string) => {
     try {
-      const { data } = await axios.put("/chats/removeuser/", {
-        chatId: chatId,
-      });
+      const { data } = await axios.get(`/chats/read-messages/${chatId}`);
       return data;
     } catch (error) {
-      handleError(error);
-    }
-  }
-);
-
-const toggleBlockGroup = createAsyncThunk(
-  "chat/toggleBlockGroup",
-  async ({ chatId, block }: { chatId: string; block: boolean }) => {
-    try {
-      const url = block ? "/chats/blockgroup/" : "/chats/unblockgroup/";
-      const { data } = await axios.put(url, { chatId });
-      return data;
-    } catch (error) {
-      handleError(error);
-    }
-  }
-);
-
-const adminBlockUserInGroup = createAsyncThunk(
-  "chat/adminBlockUserInGroup",
-  async (data: { chatId: string; userId: string; block: boolean }) => {
-    try {
-      const url = data.block
-        ? "/chats/adminblockuser/"
-        : "/chats/adminunblockuser/";
-      const response = await axios.put(url, {
-        chatId: data.chatId,
-        userId: data.userId,
-      });
-      return response.data;
-    } catch (error) {
-      handleError(error);
-    }
-  }
-);
-
-const getGroupDetails = createAsyncThunk(
-  "chat/getGroupDetails",
-  async (groupId: string) => {
-    try {
-      const { data } = await axios.get(`/chats/${groupId}`);
-      return data;
-    } catch (error: unknown) {
       handleError(error);
     }
   }
@@ -168,6 +123,7 @@ const chatSlice = createSlice({
         c._id === action.payload.chatId
           ? {
               ...c,
+              users: c.users,
               blockedChat: action.payload.blockedBy ? true : false,
               blockedBy: action.payload.blockedBy,
             }
@@ -176,10 +132,14 @@ const chatSlice = createSlice({
       if (state.chat && state.chat._id === action.payload.chatId) {
         state.chat = {
           ...state.chat,
+          users: state.chat.users,
           blockedChat: action.payload.blockedBy ? true : false,
           blockedBy: action.payload.blockedBy,
         };
       }
+    },
+    updateGroupChat: (state, action) => {
+      state.chat = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -194,7 +154,7 @@ const chatSlice = createSlice({
       })
       .addCase(getAllChats.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.error.message as string;
         state.success = false;
       })
 
@@ -212,7 +172,7 @@ const chatSlice = createSlice({
       })
       .addCase(createGroup.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.error.message as string;
         state.message = null;
       })
 
@@ -232,7 +192,7 @@ const chatSlice = createSlice({
       })
       .addCase(createChat.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.error.message as string;
         state.success = false;
       })
 
@@ -267,7 +227,7 @@ const chatSlice = createSlice({
       })
       .addCase(blockChat.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.error.message as string;
         state.success = false;
       })
 
@@ -302,102 +262,28 @@ const chatSlice = createSlice({
       })
       .addCase(unblockChat.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.error.message as string;
         state.success = false;
         state.message = null;
-      })
-
-      .addCase(toggleBlockGroup.fulfilled, (state, action) => {
-        state.chats = state.chats.map((c) =>
-          c._id === action.payload.chat._id
-            ? { ...c, blockedChatUsers: action.payload.chat.blockedChatUsers }
-            : c
-        );
-        if (state.chat && state.chat._id === action.payload.chat._id) {
-          state.chat = {
-            ...state.chat,
-            blockedChatUsers: action.payload.chat.blockedChatUsers,
-          };
-        }
-        state.success = true;
-        state.message = action.meta.arg.block
-          ? "Group blocked successfully"
-          : "Group unblocked successfully";
-      })
-      .addCase(toggleBlockGroup.rejected, (state, action) => {
-        state.error = action.payload as string;
-      })
-      .addCase(adminBlockUserInGroup.fulfilled, (state, action) => {
-        state.chats = state.chats.map((c) =>
-          c._id === action.payload.chat._id
-            ? {
-                ...c,
-                blockedChatUsers: action.payload.chat.blockedChatUsers,
-                adminBlockedUsers: action.payload.chat.adminBlockedUsers,
-              }
-            : c
-        );
-        if (state.chat && state.chat._id === action.payload.chat._id) {
-          state.chat = {
-            ...state.chat,
-            blockedChatUsers: action.payload.chat.blockedChatUsers,
-            adminBlockedUsers: action.payload.chat.adminBlockedUsers,
-          };
-        }
-        state.success = true;
-        state.message = action.meta.arg.block
-          ? "User blocked in group successfully"
-          : "User unblocked in group successfully";
-      })
-      .addCase(adminBlockUserInGroup.rejected, (state, action) => {
-        state.error = action.payload as string;
-      })
-
-      .addCase(leaveGroup.fulfilled, (state, action) => {
-        state.chats = state.chats.map((c) =>
-          c._id === action.payload.chat._id
-            ? { ...c, users: action.payload.chat.users }
-            : c
-        );
-        if (state.chat && state.chat._id === action.payload.chat._id) {
-          state.chat = {
-            ...state.chat,
-            users: action.payload.chat.users,
-          };
-        }
-        state.success = true;
-        state.message = "Left group successfully";
-      })
-      .addCase(leaveGroup.rejected, (state, action) => {
-        state.error = action.payload as string;
-      })
-
-      .addCase(getGroupDetails.fulfilled, (state, action) => {
-        state.chat = action.payload.chat;
-      })
-      .addCase(getGroupDetails.rejected, (state, action) => {
-        state.error = action.payload as string;
       });
   },
 });
 
 export default chatSlice.reducer;
-const { clearErrors, clearSuccess, setChat, updateChats, toggleBlockChat } =
-  chatSlice.actions;
-
-export {
-  getAllChats,
-  createGroup,
+export const {
   clearErrors,
   clearSuccess,
   setChat,
   updateChats,
+  toggleBlockChat,
+  updateGroupChat,
+} = chatSlice.actions;
+
+export {
+  getAllChats,
+  createGroup,
   createChat,
   blockChat,
   unblockChat,
-  toggleBlockChat,
-  leaveGroup,
-  toggleBlockGroup,
-  adminBlockUserInGroup,
-  getGroupDetails,
+  readAllMessage,
 };

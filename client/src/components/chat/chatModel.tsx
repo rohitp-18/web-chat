@@ -12,12 +12,19 @@ import { useSocket } from "@/store/context/socketContext";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Reply, Send } from "@mui/icons-material";
 import axios from "@/store/axios";
-import { toggleBlockChat, updateChats } from "@/store/chatSlice";
+import {
+  readAllMessage,
+  toggleBlockChat,
+  updateChats,
+} from "@/store/chatSlice";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import Link from "next/link";
 import ChatInfo from "./chatInfo";
 import { Button } from "../ui/button";
 import { ArrowDown, Check, LucideCheckCheck, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
+import { clearErrors, clearSuccess } from "@/store/groupSlice";
+import GroupInfo from "./groupInfo";
 
 const ChatModel = () => {
   const [messageInput, setMessageInput] = useState("");
@@ -32,6 +39,11 @@ const ChatModel = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { chat } = useSelector((root: RootState) => root.chat);
   const { user } = useSelector((root: RootState) => root.user);
+  const {
+    success,
+    error,
+    message: groupMessage,
+  } = useSelector((root: RootState) => root.group);
   const ref = useRef<HTMLDivElement>(null);
 
   const typingInp = useCallback(
@@ -123,6 +135,20 @@ const ChatModel = () => {
     senderId: string;
   }
 
+  useEffect(() => {
+    if (success) {
+      toast.success(groupMessage, {
+        position: "top-center",
+      });
+      dispatch(clearSuccess());
+    }
+    if (error) {
+      toast.error(error, {
+        position: "top-center",
+      });
+      dispatch(clearErrors());
+    }
+  }, [success, error, dispatch, groupMessage]);
   useEffect(() => {
     if (!socket || !chat || !user) return;
 
@@ -240,7 +266,6 @@ const ChatModel = () => {
       if (!chat._id || chat._id !== data.chat._id) {
       } else {
         setMessage((prev) => [...prev, data]);
-        console.log("new message", data);
         dispatch(updateChats({ _id: chat._id, message: data }));
 
         socket.emit("read_message", {
@@ -249,6 +274,8 @@ const ChatModel = () => {
           userId: data.sender._id,
           senderId: user._id,
         });
+
+        dispatch(readAllMessage(data.chat._id));
       }
     });
 
@@ -288,7 +315,7 @@ const ChatModel = () => {
             setScrollPosition(el.currentTarget.scrollTop);
           }}
         >
-          <ChatInfo />
+          {chat.isGroup ? <GroupInfo /> : <ChatInfo />}
           {message &&
             message.map((m, i) => (
               <Fragment key={m._id}>
@@ -452,7 +479,7 @@ const ChatModel = () => {
                         {m.read.length === chat.users.length ? (
                           <LucideCheckCheck className="text-blue-500 w-3 h-3" />
                         ) : (
-                          <Check className="text-gray-500 w-4 h-4" />
+                          <Check className="text-gray-500 w-3 h-3" />
                         )}
                       </span>
                     )}
@@ -512,7 +539,8 @@ const ChatModel = () => {
         }}
         className="w-full"
       >
-        {!chat.blockedChat ? (
+        {(!chat.isGroup && !chat.blockedChat) ||
+        (chat.isGroup && chat.group?.members.includes(user._id)) ? (
           <>
             {replying && parentMessage && (
               <div className="mb-2 p-2 w-full bg-gray-100 rounded-t-md flex justify-between items-center">
@@ -609,26 +637,43 @@ const ChatModel = () => {
             <div className="flex items-center gap-3 bg-red-50 rounded-lg border border-red-200 px-4 py-1 w-full">
               <X className="w-5 h-5 text-red-500 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-red-700">
-                  <span className="font-semibold text-red-900">
-                    Chat Blocked
-                  </span>{" "}
-                  by{" "}
-                  <Link
-                    href={`/in/${chat.blockedBy?.username}`}
-                    className="font-medium hover:underline text-red-900"
-                  >
-                    {chat.blockedBy?.name}
-                  </Link>
-                </p>
+                {chat.isGroup ? (
+                  chat.group?.blockedMembers.includes(user._id) ? (
+                    <p className="text-sm text-red-700">
+                      <span className="font-semibold text-red-900">
+                        You are blocked
+                      </span>
+                      from sending messages in this group
+                    </p>
+                  ) : chat.group?.userBlocked.includes(user._id) ? (
+                    <p className="text-sm text-red-700">
+                      <span className="font-semibold text-red-900">
+                        This group is blocked
+                      </span>{" "}
+                      by you.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-red-700">
+                      <span className="font-semibold text-red-900">
+                        You not member of this group
+                      </span>
+                    </p>
+                  )
+                ) : (
+                  <p className="text-sm text-red-700">
+                    <span className="font-semibold text-red-900">
+                      Chat Blocked
+                    </span>{" "}
+                    by{" "}
+                    <Link
+                      href={`/in/${chat.blockedBy?.username}`}
+                      className="font-medium hover:underline text-red-900"
+                    >
+                      {chat.blockedBy?.name}
+                    </Link>
+                  </p>
+                )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-red-200 text-red-600 hover:bg-red-100 shrink-0"
-              >
-                Learn More
-              </Button>
             </div>
           </div>
         )}

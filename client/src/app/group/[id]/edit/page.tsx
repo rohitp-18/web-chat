@@ -1,5 +1,6 @@
 "use client";
 
+import Header from "@/components/Header";
 import ProtectRoute from "@/components/ProtectRoute";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import Loader from "@/components/utils/loader";
 import axios from "@/store/axios";
-import { clearErrors, clearSuccess } from "@/store/chatSlice";
+import {
+  clearErrors,
+  clearSuccess,
+  getGroupDetails,
+  updateGroup,
+} from "@/store/groupSlice";
 import { AppDispatch, RootState } from "@/store/store";
 import { Edit } from "@mui/icons-material";
 import { isAxiosError } from "axios";
@@ -28,10 +34,11 @@ function Page() {
   const [about, setAbout] = useState("");
   const [available, setAvailable] = useState<boolean | null>(true);
   const [availableLoading, setAvailableLoading] = useState(false);
+  const [removeAvatar, setRemoveAvatar] = useState(false);
 
   const { user } = useSelector((root: RootState) => root.user);
-  const { chat, loading, success, error } = useSelector(
-    (root: RootState) => root.chat
+  const { group, loading, success, error } = useSelector(
+    (root: RootState) => root.group
   );
 
   const dispatch = useDispatch<AppDispatch>();
@@ -67,6 +74,10 @@ function Page() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    if (!group) {
+      return;
+    }
+
     if (availableUsername && username !== availableUsername && !available) {
       toast.error("Please choose an available username", {
         position: "top-center",
@@ -88,6 +99,11 @@ function Page() {
     if (newAvatar) {
       formData.append("avatar", newAvatar);
     }
+    if (removeAvatar) {
+      formData.append("removeAvatar", "true");
+    }
+
+    dispatch(updateGroup({ groupId: group._id, formData }));
   };
 
   const uploadAvatar = useCallback(
@@ -101,38 +117,46 @@ function Page() {
       };
       reader.readAsDataURL(e.target.files[0]);
       setNewAvatar(e.target.files[0]);
+      setRemoveAvatar(false);
     },
     [setAvatarPreview]
   );
 
   useEffect(() => {
-    if (chat && user && chat.chatUsername !== id) {
-      if (chat.admin._id !== user._id) {
+    if (group && user && group._id !== id) {
+      if (group.admins.find((u) => u._id === user._id)) {
         toast.error("You are not authorized to edit this group", {
           position: "top-center",
         });
         router.push(`/group/${id}`);
       }
     }
-  }, [chat, id, router, user]);
+  }, [group, id, router, user]);
 
   useEffect(() => {
-    if (chat) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setName(chat.chatName || "");
-      setUsername(chat.chatUsername || "");
-      setAbout(chat.about || "");
-      setAvatarPreview(chat.avatar?.url || null);
+    if (group && user) {
     }
-  }, [chat]);
+    if (!group) {
+      dispatch(getGroupDetails(id as string));
+    }
+  }, [group, user]);
+  useEffect(() => {
+    if (group) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setName(group.name || "");
+      setUsername(group.username || "");
+      setAbout(group.about || "");
+      setAvatarPreview(group.avatar?.url || null);
+    }
+  }, [group]);
 
   useEffect(() => {
     if (success) {
       toast.success("Group details updated successfully", {
         position: "top-center",
       });
-      router.push(`/group/${id}`);
       dispatch(clearSuccess());
+      router.push(`/group/${id}`);
     }
     if (error) {
       toast.error(error, {
@@ -152,9 +176,7 @@ function Page() {
 
   return (
     <ProtectRoute>
-      <Link href={`/group/${id}`} className="text-blue-500 hover:underline">
-        &larr; Back to Group
-      </Link>
+      <Header />
       <div className="max-w-xl mx-auto px-4 py-8">
         <div className="mb-8 flex justify-center items-center flex-col text-center">
           <h1 className="text-2xl font-bold mb-1">Edit Group Details</h1>
@@ -168,39 +190,50 @@ function Page() {
             <div className="flex items-center justify-center flex-col gap-4">
               <div className="relative" onClick={() => ref.current?.click()}>
                 <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200 hover:shadow-sm cursor-pointer">
-                  {!newAvatar && !avatarPreview ? (
-                    <Avatar className="w-full h-full">
-                      <AvatarImage src={user?.avatar?.url} alt={user?.name} />
-                      <AvatarFallback className="text-2xl bg-gray-100">
-                        {user?.name?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <Image
+                  <Avatar className="w-full h-full">
+                    <AvatarImage
                       src={
+                        (newAvatar ? URL.createObjectURL(newAvatar) : "") ||
                         avatarPreview ||
-                        (newAvatar ? URL.createObjectURL(newAvatar) : "")
+                        undefined
                       }
-                      alt="Avatar Preview"
-                      width={96}
-                      height={96}
-                      className="w-full h-full object-cover"
+                      alt={user?.name}
                     />
-                  )}
+                    <AvatarFallback className="text-2xl bg-gray-100">
+                      {user?.name?.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/30 rounded-full">
                     <Edit className="text-white" />
                   </div>
                 </div>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="default"
+                  size={"sm"}
                   className="cursor-pointer"
                   onClick={() => ref.current?.click()}
                 >
                   Upload Photo
                 </Button>
+                {(avatarPreview || newAvatar) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                    size={"sm"}
+                    onClick={() => {
+                      setNewAvatar(null);
+                      setAvatarPreview(null);
+                      setRemoveAvatar(true);
+                    }}
+                  >
+                    Remove Photo
+                  </Button>
+                )}
                 <input
                   type="file"
                   id="avatar"

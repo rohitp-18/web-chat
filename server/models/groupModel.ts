@@ -24,11 +24,21 @@ const groupShema = new Schema({
     type: String,
     trim: true,
   },
+  chat: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Chat",
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
   },
+  admins: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
   members: [
     {
       type: mongoose.Schema.Types.ObjectId,

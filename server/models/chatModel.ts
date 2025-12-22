@@ -10,22 +10,9 @@ const chatSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    avatar: {
-      url: {
-        type: String,
-      },
-      public_id: {
-        type: String,
-      },
-    },
-    about: {
-      type: String,
-      trim: true,
-    },
     chatUsername: {
       type: String,
       trim: true,
-      unique: true,
     },
     users: [
       {
@@ -33,26 +20,21 @@ const chatSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    oldUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    group: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
+      default: null,
+    },
     latestMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
     },
-    admin: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-    blockedChatUsers: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-    adminBlockedUsers: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
     blockedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

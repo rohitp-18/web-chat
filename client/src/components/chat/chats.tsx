@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Avatar,
-  Box,
-  Modal,
-  IconButton,
-  useMediaQuery,
-  useTheme,
-} from "@mui/material";
+import { Box, Modal, IconButton, useMediaQuery, useTheme } from "@mui/material";
 import { useSelector, useDispatch } from "react-redux";
 import { ArrowBack } from "@mui/icons-material";
 import { useEffect, useMemo, useState } from "react";
@@ -18,12 +11,10 @@ import {
   blockChat,
   clearErrors,
   clearSuccess,
-  leaveGroup,
   setChat,
-  toggleBlockGroup,
   unblockChat,
+  updateGroupChat,
 } from "@/store/chatSlice";
-import Group from "./Group";
 import ChatModel from "./chatModel";
 import {
   DropdownMenu,
@@ -31,15 +22,21 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "../ui/dropdown-menu";
-import { DropdownMenuSeparator } from "@radix-ui/react-dropdown-menu";
 import { EllipsisVertical } from "lucide-react";
 import Link from "next/link";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
+import {
+  leaveGroup,
+  userBlockGroup,
+  userUnblockGroup,
+} from "@/store/groupSlice";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import GroupInfo from "./groupInfo";
 
 const Chat = () => {
-  const [model, setModel] = useState(false);
   const [userInfo, setUserInfo] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -53,23 +50,52 @@ const Chat = () => {
   const router = useRouter();
   const { socket, onlineUser } = useSocket();
 
-  const handleLeaveGroup = () => {
-    if (!chat) return;
-    if (chat.users.find((u) => u._id === user?._id)) {
-      dispatch(leaveGroup(chat._id));
-    } else {
-      toast.error("You are not a member of this group", {
-        duration: 4000,
-        position: "top-center",
-      });
-    }
+  const leaveHandler = () => {
+    if (!chat?.group || !user) return;
+    dispatch(leaveGroup(chat.group._id)).then((res) => {
+      if (res.payload?.success) {
+        dispatch(
+          updateGroupChat({
+            ...chat,
+            users: chat.users.filter((m) => m._id !== user?._id),
+            oldUsers: [...chat.oldUsers, user._id],
+            group: {
+              ...chat.group,
+              members: chat.group?.members.filter((m) => m != user._id),
+            },
+          })
+        );
+      }
+    });
+  };
+
+  const unblockHandler = () => {
+    if (!chat?.group || !user) return;
+    dispatch(userUnblockGroup(chat.group._id)).then((res) => {
+      if (res.payload?.success) {
+        dispatch(
+          updateGroupChat({
+            ...chat,
+            users: [...chat.users, user],
+            oldUsers: chat.oldUsers.filter((m) => m !== user._id),
+            group: {
+              ...chat.group,
+              members: [...(chat.group?.members ?? []), user._id],
+              unblockChat: chat.group?.userBlocked.filter(
+                (m) => m !== user._id
+              ),
+            },
+          })
+        );
+      }
+    });
   };
 
   const blockUserChat = () => {
     if (!chat) return;
     if (!chat.isGroup) {
       if (chat.blockedChat) {
-        dispatch(unblockChat(chat._id)).then((data) => console.log(data));
+        dispatch(unblockChat(chat._id));
       } else {
         dispatch(blockChat(chat._id));
       }
@@ -77,14 +103,23 @@ const Chat = () => {
   };
 
   const blockGroupChat = () => {
-    if (!chat) return;
-    if (chat.isGroup) {
-      if (chat.blockedChat) {
-        dispatch(toggleBlockGroup({ chatId: chat._id, block: false }));
-      } else {
-        dispatch(toggleBlockGroup({ chatId: chat._id, block: true }));
+    if (!chat?.group || !user) return;
+    dispatch(userBlockGroup(chat.group._id)).then((res) => {
+      if (res.payload?.success) {
+        dispatch(
+          updateGroupChat({
+            ...chat,
+            oldUsers: [...chat.oldUsers, user._id],
+            users: chat.users.filter((m) => m._id !== user._id),
+            group: {
+              ...chat.group,
+              members: chat.group?.members.filter((m) => m != user._id),
+              userBlocked: [...(chat.group?.userBlocked ?? []), user._id],
+            },
+          })
+        );
       }
-    }
+    });
   };
 
   useEffect(() => {
@@ -169,17 +204,16 @@ const Chat = () => {
               </IconButton>
             )}
             <Box sx={{ position: "relative", mr: 2 }}>
-              <Avatar
-                sx={{
-                  width: { xs: 36, md: 42 },
-                  height: { xs: 36, md: 42 },
-                  background: "rgba(255,255,255,0.2)",
-                  backdropFilter: "blur(10px)",
-                }}
-              >
-                {chat.isGroup
-                  ? chat.chatName.charAt(0).toUpperCase()
-                  : otherUser?.name.charAt(0).toUpperCase() || "U"}
+              <Avatar className="w-9 md:w-10 h-9 md:h-10 bg-blue-500 text-white text-4xl">
+                <AvatarImage
+                  src={chat.isGroup ? "" : otherUser?.avatar?.url}
+                  alt={chat.isGroup ? chat.chatName : otherUser?.name || "User"}
+                />
+                <AvatarFallback className="bg-white/20 backdrop-blur-[10px] text-white font-semibold text-sm">
+                  {chat.isGroup
+                    ? chat.chatName.charAt(0).toUpperCase()
+                    : otherUser?.name.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
               </Avatar>
               {!chat.isGroup && otherUser && onlineUser.has(otherUser._id) && (
                 <Box
@@ -219,15 +253,6 @@ const Chat = () => {
               )}
             </Box>
           </Box>
-          {/* <IconButton
-            onClick={() => setUserInfo(true)}
-            sx={{
-              color: "#fff",
-              "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
-            }}
-          >
-            <Info />
-          </IconButton> */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <IconButton
@@ -248,7 +273,7 @@ const Chat = () => {
                       : `/in/${otherUser?.username}`
                   }
                 >
-                  View Profile
+                  View {chat.isGroup ? "Group Details" : "Profile"}
                 </Link>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -256,23 +281,31 @@ const Chat = () => {
                 {chat.isGroup ? "Group Info" : "User Info"}
               </DropdownMenuItem>
               {chat.isGroup ? (
-                <>
-                  <DropdownMenuItem onClick={handleLeaveGroup}>
-                    Leave Group
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={
-                      chat.adminBlockedUsers.find((u) => u._id === user._id)
-                        ? true
-                        : false
-                    }
-                    onClick={blockGroupChat}
-                  >
-                    {chat.blockedChatUsers.find((u) => u._id === user._id)
-                      ? "Unblock Group"
-                      : "Block Group"}
-                  </DropdownMenuItem>
-                </>
+                !chat.group?.admins.includes(user._id) && (
+                  <>
+                    {chat.group?.members.includes(user._id) && (
+                      <DropdownMenuItem onClick={leaveHandler}>
+                        Leave Group
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      disabled={
+                        chat.group?.userBlocked.find((u) => u === user._id)
+                          ? true
+                          : false
+                      }
+                      onClick={
+                        chat.group?.userBlocked.includes(user._id)
+                          ? unblockHandler
+                          : blockGroupChat
+                      }
+                    >
+                      {chat.group?.userBlocked.find((u) => u === user._id)
+                        ? "Unblock Group"
+                        : "Block Group"}
+                    </DropdownMenuItem>
+                  </>
+                )
               ) : (
                 <DropdownMenuItem onClick={blockUserChat}>
                   {chat.blockedChat ? "Unblock User" : "Block User"}
@@ -283,77 +316,41 @@ const Chat = () => {
         </div>
 
         {/* Modals */}
-        {chat && chat.isGroup && userInfo ? (
+        {chat && userInfo && (
           <Modal open={userInfo} onClose={() => setUserInfo(false)}>
-            <Box className="mx-auto py-4 mt-20 border-0 outline-0 max-w-[90vw] md:max-w-[400px] bg-white rounded-lg shadow-xl flex flex-col justify-center items-center">
-              {model ? (
-                <Group
-                  group={chat ? true : false}
-                  setGroup={(val: boolean) => setModel(val)}
-                />
-              ) : (
-                <div className="p-4 w-full">
-                  <div className="text-xl font-bold text-center mb-4 text-gray-800">
-                    Group Info
-                  </div>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {chat.users &&
-                      chat.users.map((user) => {
-                        return (
-                          <div
-                            key={user._id}
-                            className="px-3 py-1 text-white text-sm rounded-full"
-                            style={{
-                              background:
-                                "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
-                            }}
-                          >
-                            {user.name}
-                          </div>
-                        );
-                      })}
-                  </div>
-                  <button
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
-                    }}
-                    className="w-full py-2 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
-                    onClick={() => setModel(true)}
-                  >
-                    Update Group
-                  </button>
-                </div>
-              )}
-            </Box>
-          </Modal>
-        ) : (
-          <Modal open={userInfo} onClose={() => setUserInfo(false)}>
-            <Box className="mx-auto py-6 mt-20 border-0 outline-0 max-w-[90vw] md:max-w-[350px] bg-white rounded-lg shadow-xl flex flex-col justify-center items-center">
-              <Box className="flex flex-col justify-center items-center p-4">
-                <Avatar
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    mb: 2,
-                    background:
-                      "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
-                    fontSize: "2rem",
-                  }}
-                >
-                  {otherUser?.name.charAt(0).toUpperCase() || "U"}
-                </Avatar>
-                <h1 className="font-bold text-xl text-gray-800">
-                  {otherUser?.name || "User"}
-                </h1>
-                <p className="text-gray-500 mt-1">
-                  @{otherUser?.username || "username"}
-                </p>
-                <Button variant={"outline"} className="mt-6" asChild>
-                  <Link href={`/in/${otherUser?.username}`}>View Profile</Link>
-                </Button>
+            {chat.isGroup && chat.group ? (
+              <GroupInfo />
+            ) : (
+              <Box className="mx-auto py-6 mt-20 border-0 outline-0 max-w-[90vw] md:max-w-[350px] bg-white rounded-lg shadow-xl flex flex-col justify-center items-center">
+                <Box className="flex flex-col justify-center items-center p-4">
+                  <Avatar className="w-20 h-20 mb-4 bg-blue-500 text-white text-4xl">
+                    <AvatarImage
+                      src={otherUser?.avatar?.url}
+                      alt={otherUser?.name || "User"}
+                    />
+                    <AvatarFallback
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                      }}
+                    >
+                      {otherUser?.name.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <h1 className="font-bold text-xl text-gray-800">
+                    {otherUser?.name || "User"}
+                  </h1>
+                  <p className="text-gray-500 mt-1">
+                    @{otherUser?.username || "username"}
+                  </p>
+                  <Button variant={"outline"} className="mt-6" asChild>
+                    <Link href={`/in/${otherUser?.username}`}>
+                      View Profile
+                    </Link>
+                  </Button>
+                </Box>
               </Box>
-            </Box>
+            )}
           </Modal>
         )}
 

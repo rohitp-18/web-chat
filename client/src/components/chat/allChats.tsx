@@ -1,21 +1,19 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import { Avatar } from "@mui/material";
-import React, { useEffect, useState } from "react";
-import Group from "./Group";
+import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "@/store/store";
-import { setChat } from "@/store/chatSlice";
+import { RootState, AppDispatch } from "@/store/store";
+import { readAllMessage, setChat } from "@/store/chatSlice";
 import { chat } from "@/store/types/chatType";
 import { useSocket } from "@/store/context/socketContext";
+import Link from "next/link";
 
 function AllChats() {
-  const [group, setGroup] = useState(false);
-
   const { chats, chat, loading } = useSelector(
     (state: RootState) => state.chat
   );
   const { user } = useSelector((state: RootState) => state.user);
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { onlineUser, socket } = useSocket();
 
   const chatOpen = (item: chat) => {
@@ -24,42 +22,16 @@ function AllChats() {
       socket.emit("all_read_message", {
         chatId: item._id,
         message: item.latestMessage,
-        userId: item.latestMessage?.sender._id,
+        users: item.users,
         senderId: user?._id,
       });
     }
+    dispatch(readAllMessage(item._id));
   };
 
   if (!chats || !user) {
     return null;
   }
-
-  // useEffect(() => {
-  //   console.log(chats.length, chatCount, socket);
-  //   if (chats.length > 0 && chats.length !== chatCount && socket && user) {
-  //     socket.emit("check_online_users", {
-  //       users: [
-  //         ...chats
-  //           .filter((c) => !c.isGroup)
-  //           .map((c) =>
-  //             c.users[0]._id === user._id ? c.users[1]._id : c.users[0]._id
-  //           ),
-  //         user._id,
-  //       ],
-  //     });
-  //     setChatCount(chats.length);
-  //   }
-  // }, [chatCount, chats, socket, user]);
-
-  // useEffect(() => {
-  //   console.log("line 47");
-  //   if (socket && user) {
-  //     socket.on("online_users", (data: { onlineUserIds: string[] }) => {
-  //       setOnlineUsers(data.onlineUserIds);
-  //       console.log(data);
-  //     });
-  //   }
-  // }, [socket, user]);
 
   useEffect(() => {
     console.log(onlineUser);
@@ -72,8 +44,8 @@ function AllChats() {
           Chats
         </span>
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setGroup(true)}
+          <Link
+            href={"/new"}
             className="p-2 rounded-full text-white hover:shadow-lg transition-all shadow-md"
             style={{
               background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
@@ -86,11 +58,9 @@ function AllChats() {
                 clipRule="evenodd"
               />
             </svg>
-          </button>
+          </Link>
         </div>
       </div>
-
-      {group && <Group group={group} setGroup={setGroup} />}
 
       <div
         className="space-y-1 overflow-y-auto h-full"
@@ -167,9 +137,13 @@ function AllChats() {
                     {latestMessage && (
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-xs md:text-xs text-gray-500 truncate max-w-[180px] md:max-w-[220px]">
-                          {item.isGroup && latestMessage.sender
-                            ? `${latestMessage.sender.name}: `
-                            : ""}
+                          {item.isGroup && latestMessage.sender ? (
+                            <b className="font-semibold mr-1">
+                              {latestMessage.sender.name}:{" "}
+                            </b>
+                          ) : (
+                            ""
+                          )}
                           {latestMessage.content}
                         </span>
                         {item._id !== chat?._id &&

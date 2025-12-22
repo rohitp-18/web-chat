@@ -42,6 +42,13 @@ function setupSocket(server: HttpServer): void {
     );
 
     socket.on("new message", (data: any) => {
+      if (data.isGroup) {
+        data.users.forEach((user: string) => {
+          if (data.sender._id === user) return;
+          socket.in(user).emit("message received", data);
+        });
+        return;
+      }
       data.chat.users.forEach((user: { _id: string }) => {
         if (data.sender._id === user._id) return;
         socket.in(user._id).emit("message received", data);
@@ -70,14 +77,16 @@ function setupSocket(server: HttpServer): void {
       socket.to(data.userId).emit("message_read", data);
     });
 
-    socket.on("all_read_messages", (data: any) => {
-      socket.to(data.userId).emit("all_messages_read", data);
+    socket.on("all_read_message", (data: any) => {
+      data.users.forEach((userId: { _id: string }) => {
+        if (userId._id === data.senderId) return;
+        socket.to(userId._id).emit("all_messages_read", data);
+      });
     });
 
     socket.on(
       "user_going_offline",
       (data: { userId: string; onlineUser: Set<string> }) => {
-        console.log(data, "user going offline");
         const { userId, onlineUser } = data;
         const socketIds = [...onlineUsers.values()];
         for (const uid of socketIds) {

@@ -1,20 +1,32 @@
 "use client";
 
+import Header from "@/components/Header";
 import ProtectRoute from "@/components/ProtectRoute";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import Loader from "@/components/utils/loader";
 import axios from "@/store/axios";
-import { clearErrors, clearSuccess } from "@/store/chatSlice";
+import { clearGroupState, createGroup, clearErrors } from "@/store/groupSlice";
 import { AppDispatch, RootState } from "@/store/store";
+import { user } from "@/store/types/userType";
+import { findUsers } from "@/store/userSlice";
 import { Edit } from "@mui/icons-material";
+import { IconButton } from "@mui/material";
 import { isAxiosError } from "axios";
+import { X } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useCallback, useRef, useState, useEffect } from "react";
+import React, {
+  useCallback,
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+} from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 
@@ -25,12 +37,16 @@ function Page() {
   const [username, setUsername] = useState("");
   const [availableUsername, setAvailableUsername] = useState<string>("");
   const [about, setAbout] = useState("");
-  const [available, setAvailable] = useState<boolean | null>(true);
+  const [available, setAvailable] = useState<boolean | null>(false);
   const [availableLoading, setAvailableLoading] = useState(false);
+  const [membersId, setMembersId] = useState<string[]>([]);
+  const [memberInput, setMemberInput] = useState("");
+  const [members, setMembers] = useState<user[]>([]);
+  const [showUserList, setShowUserList] = useState(false);
 
-  const { user } = useSelector((root: RootState) => root.user);
-  const { loading, success, error } = useSelector(
-    (root: RootState) => root.chat
+  const { user, searchResults } = useSelector((root: RootState) => root.user);
+  const { loading, success, error, group } = useSelector(
+    (root: RootState) => root.group
   );
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
@@ -81,31 +97,15 @@ function Page() {
     const formData = new FormData();
     formData.append("name", name);
     formData.append("username", username);
-    formData.append("about", about);
+    if (about) {
+      formData.append("about", about);
+    }
     if (newAvatar) {
       formData.append("avatar", newAvatar);
     }
+    membersId.forEach((memberId) => formData.append("members", memberId));
 
-    try {
-      const { data } = await axios.post("/chat/create-group", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      toast.success("Group created successfully", {
-        position: "top-center",
-      });
-      router.push(`/group/${data.groupId}`);
-    } catch (error: unknown) {
-      toast.error(
-        isAxiosError(error)
-          ? error.response?.data.message
-          : "An unexpected error occurred",
-        {
-          position: "top-center",
-        }
-      );
-    }
+    dispatch(createGroup(formData));
   };
 
   const uploadAvatar = useCallback(
@@ -123,12 +123,18 @@ function Page() {
     [setAvatarPreview]
   );
 
+  const storeSearchResults = useMemo(
+    () => searchResults?.filter((user) => !membersId.includes(user._id)),
+    [searchResults, membersId]
+  );
+
   useEffect(() => {
     if (success) {
       toast.success("Group created successfully", {
         position: "top-center",
       });
-      dispatch(clearSuccess());
+      dispatch(clearGroupState());
+      router.push(`/group/${group?._id}`);
     }
     if (error) {
       toast.error(error, {
@@ -136,7 +142,13 @@ function Page() {
       });
       dispatch(clearErrors());
     }
-  }, [success, error, dispatch]);
+  }, [success, error, dispatch, group, router]);
+
+  useEffect(() => {
+    if (memberInput) {
+      dispatch(findUsers(memberInput));
+    }
+  }, [memberInput, dispatch]);
 
   if (!user) {
     return (
@@ -148,18 +160,19 @@ function Page() {
 
   return (
     <ProtectRoute>
-      <Link href="/group" className="text-blue-500 hover:underline">
-        &larr; Back to Groups
-      </Link>
+      <Header />
       <div className="max-w-xl mx-auto px-4 py-8">
         <div className="mb-8 flex justify-center items-center flex-col text-center">
           <h1 className="text-2xl font-bold mb-1">Create New Group</h1>
           <p className="text-gray-500">Start a new group conversation</p>
         </div>
 
-        <form className="space-y-6" onSubmit={handleSubmit}>
+        <form
+          className="space-y-6 flex flex-col gap-1.5"
+          onSubmit={handleSubmit}
+        >
           {/* Avatar Section */}
-          <div className="flex justify-center flex-col gap-4">
+          <div className="flex justify-center flex-col gap-2">
             <Label className="text-lg font-semibold">Group Picture</Label>
             <div className="flex items-center justify-center flex-col gap-4">
               <div className="relative" onClick={() => ref.current?.click()}>
@@ -205,7 +218,7 @@ function Page() {
           </div>
 
           {/* Name Section */}
-          <div className="flex justify-center flex-col gap-4">
+          <div className="flex justify-center flex-col gap-2">
             <Label htmlFor="name" className="text-lg font-semibold">
               Group Name
             </Label>
@@ -220,7 +233,7 @@ function Page() {
             />
           </div>
 
-          <div className="flex justify-center flex-col gap-4">
+          <div className="flex justify-center flex-col gap-2">
             <Label htmlFor="username" className="text-lg font-semibold">
               Group Handle
             </Label>
@@ -231,7 +244,7 @@ function Page() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter group handle"
-                className="text-base bg-gray-100"
+                className="text-base"
                 maxLength={30}
               />
               <Button
@@ -259,9 +272,103 @@ function Page() {
             )}
           </div>
 
-          <div className="flex justify-center flex-col gap-4">
+          <div className="flex justify-center flex-col gap-2">
+            <Label className="text-lg font-semibold">Group Members</Label>
+            <p className="text-gray-600 -mt-2 text-sm">
+              You can add members after creating the group.
+            </p>
+
+            {members.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {members.map((member) => (
+                  <div
+                    key={member._id}
+                    className="flex items-center bg-gray-100 px-1.5 py-1 rounded-full"
+                  >
+                    <Badge variant="secondary" className="px-1">
+                      <Avatar className="w-5 h-5 mr-1">
+                        <AvatarImage
+                          src={member.avatar?.url}
+                          alt={member.name}
+                        />
+                        <AvatarFallback>
+                          {member.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {member.name}
+                    </Badge>
+                    <IconButton
+                      type="button"
+                      onClick={() => {
+                        setMembersId((prev) =>
+                          prev.filter((id) => id !== member._id)
+                        );
+                        setMembers((prev) =>
+                          prev.filter((user) => user._id !== member._id)
+                        );
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                    </IconButton>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Input
+              type="text"
+              placeholder="Search users to add"
+              className="text-base"
+              value={memberInput}
+              onChange={(e) => {
+                setMemberInput(e.target.value);
+                setShowUserList(true);
+              }}
+              onFocus={() => setShowUserList(true)}
+              onBlur={() => setTimeout(() => setShowUserList(false), 900)}
+            />
+            {showUserList && storeSearchResults && (
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-md mt-2">
+                {storeSearchResults.length === 0 ? (
+                  <p className="p-2 text-gray-500">No users found.</p>
+                ) : (
+                  storeSearchResults.map((foundUser) => (
+                    <div
+                      key={foundUser._id}
+                      className="flex items-center justify-between p-2 hover:bg-gray-100 cursor-pointer"
+                      onClick={() => {
+                        setMembersId((prev) => [...prev, foundUser._id]);
+                        setMembers((prev) => [...prev, foundUser]);
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-gray-200">
+                          <Avatar>
+                            <AvatarImage
+                              src={foundUser.avatar?.url}
+                              alt={foundUser.name}
+                            />
+                            <AvatarFallback>
+                              {foundUser.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                        <div>
+                          <p className="font-medium">{foundUser.name}</p>
+                          <p className="text-sm text-gray-500">
+                            @{foundUser.username}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-center flex-col gap-2">
             <Label htmlFor="about" className="text-lg font-semibold">
-              Description
+              About
             </Label>
             <Textarea
               id="about"

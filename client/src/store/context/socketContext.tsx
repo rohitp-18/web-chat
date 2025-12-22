@@ -221,6 +221,10 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   }, [socket, user, chats]);
 
   useEffect(() => {
+    setSelectedChat(chat);
+  }, [chat]);
+
+  useEffect(() => {
     console.log(onlineUser);
   }, [onlineUser]);
 

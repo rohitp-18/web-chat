@@ -7,6 +7,7 @@ import path from "path";
 import mongodb from "./config/mongodb";
 import user from "./routers/userRouter";
 import message from "./routers/messageRouter";
+import group from "./routers/groupRouter";
 import error from "./middlewares/error";
 import chat from "./routers/chatRouter";
 import setupSocket from "./socket";
@@ -52,6 +53,7 @@ app.use(morgan("dev"));
 app.use("/api/v1/user", user);
 app.use("/api/v1/chats", chat);
 app.use("/api/v1/message", message);
+app.use("/api/v1/group", group);
 
 const port = process.env.PORT;
 

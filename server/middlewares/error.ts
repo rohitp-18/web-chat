@@ -22,6 +22,7 @@ const errorMiddleware = (
   }
 
   res.status(status).json({
+    success: false,
     message,
     stackTrace: err.stack,
   });
