@@ -122,17 +122,16 @@ const chatSlice = createSlice({
       state.chats = state.chats.map((c) =>
         c._id === action.payload.chatId
           ? {
-              ...c,
-              users: c.users,
-              blockedChat: action.payload.blockedBy ? true : false,
-              blockedBy: action.payload.blockedBy,
-            }
+            ...c,
+            blockedChat: action.payload.blockedBy ? true : false,
+            blockedBy: action.payload.blockedBy,
+          }
           : c
       );
+      console.log(state.chat?._id, action.payload)
       if (state.chat && state.chat._id === action.payload.chatId) {
         state.chat = {
           ...state.chat,
-          users: state.chat.users,
           blockedChat: action.payload.blockedBy ? true : false,
           blockedBy: action.payload.blockedBy,
         };
@@ -140,7 +139,15 @@ const chatSlice = createSlice({
     },
     updateGroupChat: (state, action) => {
       state.chat = action.payload;
+      state.chats = state.chats.map((c) => c._id === action.payload._id ? action.payload : c);
     },
+    updateChatUsers: (state, action) => {
+      console.log("action", action.payload)
+      if (state.chat && state.chat.isGroup && state.chat.group && state.chat === action.payload._id) {
+        state.chat.group.members = (action.payload.users as string[])
+      }
+      state.chats = state.chats.map((c) => c._id === action.payload._id && c.group ? { ...c, group: { ...c.group, members: action.payload.users as string[] } } : c)
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -207,11 +214,11 @@ const chatSlice = createSlice({
         state.chats = state.chats.map((c) =>
           c._id === action.payload.chat._id
             ? {
-                ...c,
-                blockedAt: action.payload.chat.blockedAt,
-                blockedBy: action.payload.chat.blockedBy,
-                blockedChat: action.payload.chat.blockedChat,
-              }
+              ...c,
+              blockedAt: action.payload.chat.blockedAt,
+              blockedBy: action.payload.chat.blockedBy,
+              blockedChat: action.payload.chat.blockedChat,
+            }
             : c
         );
         if (state.chat && state.chat._id === action.payload.chat._id) {
@@ -244,11 +251,11 @@ const chatSlice = createSlice({
         state.chats = state.chats.map((c) =>
           c._id === action.payload.chat._id
             ? {
-                ...c,
-                blockedAt: null,
-                blockedBy: null,
-                blockedChat: false,
-              }
+              ...c,
+              blockedAt: null,
+              blockedBy: null,
+              blockedChat: false,
+            }
             : c
         );
         if (state.chat && state.chat._id === action.payload.chat._id) {
@@ -277,6 +284,7 @@ export const {
   updateChats,
   toggleBlockChat,
   updateGroupChat,
+  updateChatUsers
 } = chatSlice.actions;
 
 export {

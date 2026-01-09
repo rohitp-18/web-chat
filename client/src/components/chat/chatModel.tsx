@@ -4,6 +4,7 @@ import {
   isLastMessage,
   isSameSenderMargin,
   isNewDay,
+  isInfoMessage,
 } from "@/utils/logic";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/store/store";
@@ -25,6 +26,7 @@ import { ArrowDown, Check, LucideCheckCheck, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { clearErrors, clearSuccess } from "@/store/groupSlice";
 import GroupInfo from "./groupInfo";
+import { ScrollArea } from "../ui/scroll-area";
 
 const ChatModel = () => {
   const [messageInput, setMessageInput] = useState("");
@@ -284,6 +286,22 @@ const ChatModel = () => {
     };
   }, [socket, chat, dispatch, user]);
 
+  useEffect(() => {
+    if (!socket || !chat || !user) return;
+    socket.on("receive_notification", (data) => {
+      if (!chat._id || chat._id !== data.chat._id) {
+      } else {
+        setMessage((prev) => [...prev, data]);
+
+        dispatch(readAllMessage(data.chat._id));
+      }
+    });
+
+    return () => {
+      socket.off("receive_notification");
+    };
+  }, [socket, chat, dispatch, user]);
+
   // handle scrolling the page
   useEffect(() => {
     if (!ref.current) return;
@@ -303,12 +321,11 @@ const ChatModel = () => {
     <>
       <Box sx={{ flexGrow: 1, overflow: "hidden" }}>
         <div
-          className="px-2 md:px-4 py-2 w-full relative overflow-y-auto"
+          className="px-2 md:px-4 py-2 w-full relative overflow-y-auto h-full"
           style={{
             scrollbarWidth: "thin",
             overflowY: "auto",
             scrollBehavior: "smooth",
-            height: replying ? "calc(100vh - 201px)" : "calc(100vh - 138px)",
           }}
           ref={ref}
           onScroll={(el) => {
@@ -317,195 +334,208 @@ const ChatModel = () => {
         >
           {chat.isGroup ? <GroupInfo /> : <ChatInfo />}
           {message &&
-            message.map((m, i) => (
-              <Fragment key={m._id}>
-                {isNewDay(message, i) && (
-                  <div className="w-full flex justify-center my-4">
-                    <span className="px-3 py-0.5 bg-gray-200 text-gray-600 text-xs rounded-full shadow-xs">
-                      {new Date(m.createdAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+            message.map((m, i) => {
+              if (m.isInfoMessage) {
+                return (
+                  <div key={m._id} className="w-full flex justify-center my-4">
+                    <span className="px-3 py-0.5 bg-neutral-300 text-gray-600 text-xs rounded-full shadow-xs">
+                      {m.content}
                     </span>
                   </div>
-                )}
-                <div
-                  id={`m-${m._id}`}
-                  className="flex items-end mb-1 md:mb-0.5 group"
-                >
-                  {(isSameSender(message, m, i, user._id) ||
-                    isLastMessage(message, i, user._id) ||
-                    i === message.length - 1 ||
-                    isNewDay(message, i + 1)) &&
-                    m.sender._id !== user._id && (
-                      <Link
-                        href={`/profile/${m.sender.username}`}
-                        className="flex"
-                      >
-                        <Avatar
-                          className="w-8 h-8 md:w-10 md:h-10"
-                          style={{ marginRight: "8px", flexShrink: 0 }}
-                        >
-                          <AvatarImage
-                            src={m.sender.avatar?.url}
-                            alt={m.sender.name}
-                          />
-                          <AvatarFallback
-                            style={{
-                              background:
-                                "linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%)",
-                              color: "#047857",
-                              fontSize: "0.875rem",
-                              boxShadow: "0 4px 12px rgba(110, 231, 183, 0.3)",
-                            }}
-                            className="flex font-semibold items-center justify-center"
-                          >
-                            {m.sender.name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Link>
-                    )}
-                  {m.sender._id === user._id && (
-                    <div className="ml-auto flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <IconButton
-                        size="small"
-                        sx={{
-                          width: 28,
-                          height: 28,
-                          color: "text.secondary",
-                          "&:hover": {
-                            bgcolor: "rgba(239, 68, 68, 0.1)",
-                            color: "error.main",
-                          },
-                        }}
-                        onClick={() => deleteMessage(m)}
-                      >
-                        <Trash2 size={16} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        sx={{
-                          width: 28,
-                          height: 28,
-                          color: "text.secondary",
-                          "&:hover": { bgcolor: "action.hover" },
-                        }}
-                        onClick={() => {
-                          setParentMessage(m);
-                          setReplying(true);
-                        }}
-                      >
-                        <Reply sx={{ fontSize: 16 }} />
-                      </IconButton>
+                );
+              }
+              return (
+                <Fragment key={m._id}>
+                  {isNewDay(message, i) && (
+                    <div className="w-full flex justify-center my-4">
+                      <span className="px-3 py-0.5 bg-gray-200 text-gray-600 text-xs rounded-full shadow-xs">
+                        {new Date(m.createdAt).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </span>
                     </div>
                   )}
                   <div
-                    className={`px-5 py-2 my-0.5 text-sm relative leading-relaxed wrap-break-word transition-all duration-300 inline-block max-w-[90%] md:max-w-[70%] ${
-                      m.sender._id === user._id
-                        ? "text-blue-900 rounded-[18px_18px_4px_18px]"
-                        : "text-emerald-900 rounded-[18px_18px_18px_4px]"
-                    }`}
-                    style={{
-                      background: `${
-                        m.sender._id === user._id
-                          ? "linear-gradient(135deg, #bfdbfe 0%, #dbeafe 100%)"
-                          : "linear-gradient(135deg, #a7f3d0 0%, #d1fae5 100%)"
-                      }`,
-                      marginLeft: isSameSenderMargin(message, m, i, user._id),
-                      boxShadow: `${
-                        m.sender._id === user._id
-                          ? "0 4px 12px rgba(191, 219, 254, 0.3)"
-                          : "0 4px 12px rgba(167, 243, 208, 0.3)"
-                      }`,
-                      fontFamily: "Segoe UI, sans-serif",
-                    }}
-                    // ref={i === message.length - 1 ? span : spans}
+                    id={`m-${m._id}`}
+                    className="flex items-end mb-1 md:mb-0.5 group"
                   >
-                    {m.parentMessage && (
-                      <div
-                        onClick={() => {
-                          const element = m.parentMessage
-                            ? document.getElementById(
-                                `m-${m.parentMessage._id}`
-                              )
-                            : null;
-                          if (element) {
-                            element.scrollIntoView({
-                              behavior: "smooth",
-                              block: "center",
-                            });
-                            element.classList.add(
-                              "transition-all",
-                              "animate-[highlight_2s_ease-in-out]"
-                            );
-                            setTimeout(() => {
-                              element.classList.remove(
-                                "animate-[highlight_2s_ease-in-out]"
-                              );
-                            }, 2000);
-                          }
-                        }}
-                        className="mb-1 px-2 py-0.5 bg-gray-100 rounded-md border-l-4 border-blue-400"
-                      >
-                        <span className="font-medium text-[12px]">
-                          {m.parentMessage.sender.name
-                            ? m.parentMessage.sender.name
-                            : "Unknown User"}
-                        </span>
-                        <p className="text-xs text-gray-500">
-                          {m.parentMessage.content.length > 30
-                            ? m.parentMessage.content.substring(0, 30) + "..."
-                            : m.parentMessage.content}
-                        </p>
+                    {(isSameSender(message, m, i, user._id) ||
+                      isLastMessage(message, i, user._id) ||
+                      i === message.length - 1 ||
+                      isNewDay(message, i + 1) ||
+                      isInfoMessage(message, i)) &&
+                      m.sender._id !== user._id && (
+                        <Link
+                          href={`/profile/${m.sender.username}`}
+                          className="flex"
+                        >
+                          <Avatar
+                            className="w-8 h-8 md:w-10 md:h-10"
+                            style={{ marginRight: "8px", flexShrink: 0 }}
+                          >
+                            <AvatarImage
+                              src={m.sender.avatar?.url}
+                              alt={m.sender.name}
+                            />
+                            <AvatarFallback
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%)",
+                                color: "#047857",
+                                fontSize: "0.875rem",
+                                boxShadow:
+                                  "0 4px 12px rgba(110, 231, 183, 0.3)",
+                              }}
+                              className="flex font-semibold items-center justify-center"
+                            >
+                              {m.sender.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        </Link>
+                      )}
+                    {m.sender._id === user._id && (
+                      <div className="ml-auto flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <IconButton
+                          size="small"
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            color: "text.secondary",
+                            "&:hover": {
+                              bgcolor: "rgba(239, 68, 68, 0.1)",
+                              color: "error.main",
+                            },
+                          }}
+                          onClick={() => deleteMessage(m)}
+                        >
+                          <Trash2 size={16} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            color: "text.secondary",
+                            "&:hover": { bgcolor: "action.hover" },
+                          }}
+                          onClick={() => {
+                            setParentMessage(m);
+                            setReplying(true);
+                          }}
+                        >
+                          <Reply sx={{ fontSize: 16 }} />
+                        </IconButton>
                       </div>
                     )}
-                    {m.content}
-                    <div className="w-[35px] h-2.5 inline-block text-gray-500"></div>
-                    <span className="absolute bottom-2 right-4 text-[8px] text-end text-gray-500">
-                      {new Date(m.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    {m.sender._id === user._id && (
-                      <span
-                        className={`absolute bottom-2 right-0.5 text-[8px] text-end ${
-                          m.read.length === chat.users.length
-                            ? "text-blue-500"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        {m.read.length === chat.users.length ? (
-                          <LucideCheckCheck className="text-blue-500 w-3 h-3" />
-                        ) : (
-                          <Check className="text-gray-500 w-3 h-3" />
-                        )}
+                    <div
+                      className={`px-5 py-2 my-0.5 text-sm relative leading-relaxed wrap-break-word transition-all duration-300 inline-block max-w-[90%] md:max-w-[70%] ${
+                        m.sender._id === user._id
+                          ? "text-blue-900 rounded-[18px_18px_4px_18px]"
+                          : "text-emerald-900 rounded-[18px_18px_18px_4px]"
+                      }`}
+                      style={{
+                        background: `${
+                          m.sender._id === user._id
+                            ? "linear-gradient(135deg, #bfdbfe 0%, #dbeafe 100%)"
+                            : "linear-gradient(135deg, #a7f3d0 0%, #d1fae5 100%)"
+                        }`,
+                        marginLeft: isSameSenderMargin(message, m, i, user._id),
+                        boxShadow: `${
+                          m.sender._id === user._id
+                            ? "0 4px 12px rgba(191, 219, 254, 0.3)"
+                            : "0 4px 12px rgba(167, 243, 208, 0.3)"
+                        }`,
+                        fontFamily: "Segoe UI, sans-serif",
+                      }}
+                      // ref={i === message.length - 1 ? span : spans}
+                    >
+                      {m.parentMessage && (
+                        <div
+                          onClick={() => {
+                            const element = m.parentMessage
+                              ? document.getElementById(
+                                  `m-${m.parentMessage._id}`
+                                )
+                              : null;
+                            if (element) {
+                              element.scrollIntoView({
+                                behavior: "smooth",
+                                block: "center",
+                              });
+                              element.classList.add(
+                                "transition-all",
+                                "animate-[highlight_2s_ease-in-out]"
+                              );
+                              setTimeout(() => {
+                                element.classList.remove(
+                                  "animate-[highlight_2s_ease-in-out]"
+                                );
+                              }, 2000);
+                            }
+                          }}
+                          className="mb-1 px-2 py-0.5 bg-gray-100 rounded-md border-l-4 border-blue-400"
+                        >
+                          <span className="font-medium text-[12px]">
+                            {m.parentMessage.sender.name
+                              ? m.parentMessage.sender.name
+                              : "Unknown User"}
+                          </span>
+                          <p className="text-xs text-gray-500">
+                            {m.parentMessage.content.length > 30
+                              ? m.parentMessage.content.substring(0, 30) + "..."
+                              : m.parentMessage.content}
+                          </p>
+                        </div>
+                      )}
+                      {m.content}
+                      <div className="w-[35px] h-2.5 inline-block text-gray-500"></div>
+                      <span className="absolute bottom-2 right-4 text-[8px] text-end text-gray-500">
+                        {new Date(m.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
+                      {m.sender._id === user._id && (
+                        <span
+                          className={`absolute bottom-2 right-0.5 text-[8px] text-end ${
+                            m.read.length === chat.users.length
+                              ? "text-blue-500"
+                              : "text-gray-500"
+                          }`}
+                        >
+                          {m.read.length === chat.users.length ? (
+                            <LucideCheckCheck className="text-blue-500 w-3 h-3" />
+                          ) : (
+                            <Check className="text-gray-500 w-3 h-3" />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    {m.sender._id !== user._id && (
+                      <div className="ml-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <IconButton
+                          size="small"
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            color: "text.secondary",
+                            "&:hover": { bgcolor: "action.hover" },
+                          }}
+                          onClick={() => {
+                            setParentMessage(m);
+                            setReplying(true);
+                          }}
+                        >
+                          <Reply sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </div>
                     )}
                   </div>
-                  {m.sender._id !== user._id && (
-                    <div className="ml-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <IconButton
-                        size="small"
-                        sx={{
-                          width: 28,
-                          height: 28,
-                          color: "text.secondary",
-                          "&:hover": { bgcolor: "action.hover" },
-                        }}
-                        onClick={() => {
-                          setParentMessage(m);
-                          setReplying(true);
-                        }}
-                      >
-                        <Reply sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </div>
-                  )}
-                </div>
-              </Fragment>
-            ))}
+                </Fragment>
+              );
+            })}
           {scrollPosition !== top && scrollPosition < top && (
             <div
               onClick={(e) => {
@@ -536,11 +566,17 @@ const ChatModel = () => {
           borderTop: "1px solid rgba(0,0,0,0.08)",
           boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
           backgroundColor: "#fff",
+          position: "sticky",
+          bottom: 0,
+          left: 0,
+          zIndex: 100,
         }}
         className="w-full"
       >
         {(!chat.isGroup && !chat.blockedChat) ||
-        (chat.isGroup && chat.group?.members.includes(user._id)) ? (
+        (chat.isGroup &&
+          chat.group &&
+          chat.group?.members.some((u) => u === user._id)) ? (
           <>
             {replying && parentMessage && (
               <div className="mb-2 p-2 w-full bg-gray-100 rounded-t-md flex justify-between items-center">
@@ -590,14 +626,14 @@ const ChatModel = () => {
             )}
             <form
               onSubmit={sendMessage}
-              style={{ display: "flex", gap: "12px", alignItems: "center" }}
+              className="flex gap-3 sticky items-center"
             >
               <Box sx={{ flexGrow: 1, position: "relative" }}>
                 <input
                   value={messageInput}
                   type="text"
                   onChange={(e) => typingInp(e.target.value)}
-                  className="w-full px-2 md:px-3 py-1.5 md:py-2 rounded-full border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white placeholder-gray-400 shadow-sm"
+                  className="w-full px-4 py-2 rounded-full border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white placeholder-gray-400 shadow-sm"
                   autoFocus
                   placeholder="Type your message..."
                   style={{
@@ -641,7 +677,7 @@ const ChatModel = () => {
                   chat.group?.blockedMembers.includes(user._id) ? (
                     <p className="text-sm text-red-700">
                       <span className="font-semibold text-red-900">
-                        You are blocked
+                        You are blocked{" "}
                       </span>
                       from sending messages in this group
                     </p>

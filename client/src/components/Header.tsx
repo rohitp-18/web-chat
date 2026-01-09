@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Typography,
   Box,
@@ -19,10 +19,12 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { styled, useTheme } from "@mui/material/styles";
-import { Add, Settings, Person, Home, Close } from "@mui/icons-material";
+import { Add, Person, Home, Close } from "@mui/icons-material";
 import Link from "next/link";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
+import { usePathname } from "next/navigation";
+import { Shield } from "lucide-react";
 
 const drawerWidth = 280;
 const miniDrawerWidth = 64;
@@ -84,12 +86,12 @@ const ListItemTextStyled = styled(ListItemText)<{ open: boolean }>(
   })
 );
 
-export default function Header({ chat }: { chat?: boolean }) {
+export default function Header({ hidden }: { hidden?: boolean }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [bottomNavValue, setBottomNavValue] = useState(0);
 
+  const pathname = usePathname();
   const handleDrawerToggle = () => setDrawerOpen(!drawerOpen);
   const { user } = useSelector((root: RootState) => root.user);
 
@@ -113,17 +115,30 @@ export default function Header({ chat }: { chat?: boolean }) {
       link: "/new",
     },
     {
-      text: "Settings",
-      icon: <Settings />,
+      text: "Privacy",
+      icon: <Shield />,
       color: theme.palette.primary.main,
-      link: "/settings",
+      link: "/privacy",
     },
   ];
+
+  const bottomNavValue = useMemo(() => {
+    if (pathname.startsWith("/chat")) {
+      return 0;
+    } else if (pathname.startsWith(`/in/${user?.username}`)) {
+      return 1;
+    } else if (pathname.startsWith("/new")) {
+      return 2;
+    } else if (pathname.startsWith("/privacy")) {
+      return 3;
+    }
+    return 0;
+  }, [pathname, user?.username]);
 
   if (!user) return null;
 
   if (isMobile) {
-    if (chat) {
+    if (hidden) {
       return null;
     }
 
@@ -145,11 +160,16 @@ export default function Header({ chat }: { chat?: boolean }) {
         >
           <BottomNavigation
             value={bottomNavValue}
-            onChange={(event, newValue) => setBottomNavValue(newValue)}
+            showLabels
             sx={{
               background: "transparent",
               borderTopLeftRadius: 16,
               borderTopRightRadius: 16,
+              pb: 4.5,
+              pt: 4.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-around",
               "& .MuiBottomNavigationAction-root": {
                 color: "rgba(255,255,255,0.6)",
                 "&.Mui-selected": {
@@ -169,8 +189,12 @@ export default function Header({ chat }: { chat?: boolean }) {
               icon={<Person />}
               href={`/in/${user.username}`}
             />
-            <BottomNavigationAction label="Add" icon={<Add />} />
-            <BottomNavigationAction label="More" icon={<MenuIcon />} />
+            <BottomNavigationAction label="Add" icon={<Add />} href="/new" />
+            <BottomNavigationAction
+              label="Privacy"
+              icon={<Shield />}
+              href={"/privacy"}
+            />
           </BottomNavigation>
         </Paper>
       </>

@@ -30,9 +30,9 @@ function Page() {
 
   return (
     <ProtectRoute>
-      <Header chat={false} />
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-linear-to-br from-blue-50 to-indigo-100">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-lg">
+      <Header hidden={false} />
+      <div className="flex flex-col items-center justify-center min-h-screen sm:p-6 p-3 bg-linear-to-br from-blue-50 to-indigo-100">
+        <div className="bg-white rounded-2xl shadow-xl sm:p-8 p-3 w-full max-w-lg">
           <form onSubmit={handleSearch} className="mb-6">
             <div className="flex items-center border-b border-gray-300 py-2">
               <input
@@ -44,7 +44,7 @@ function Page() {
               />
               <button
                 type="submit"
-                className="shrink-0 bg-blue-500 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded"
+                className="shrink-0 bg-blue-500 hover:bg-blue-700 text-white font-semibold py-2 sm:px-4 px-2 rounded"
               >
                 Search
               </button>

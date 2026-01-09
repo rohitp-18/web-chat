@@ -26,6 +26,7 @@ function AllChats() {
         senderId: user?._id,
       });
     }
+    window.history.replaceState(null, "", `/chat?chatId=${item._id}`);
     dispatch(readAllMessage(item._id));
   };
 

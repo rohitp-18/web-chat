@@ -59,7 +59,7 @@ function Page() {
     return group.admins.find((admin) => admin._id === user._id) || null;
   }, [group, user]);
 
-  if (!user || !group || !admin) {
+  if (!user || !group) {
     return null;
   }
 
@@ -90,7 +90,7 @@ function Page() {
             </p>
           </div>
           <div className="w-full flex items-center justify-between gap-5">
-            {admin._id === user._id && (
+            {admin && admin._id === user._id && (
               <Button variant="default" className="flex-1 ml-2">
                 <Link
                   className="w-full flex justify-center items-center"
@@ -105,7 +105,9 @@ function Page() {
               <Button
                 disabled={loading}
                 onClick={() => sendMessage()}
-                variant={admin._id === user._id ? "outline" : "default"}
+                variant={
+                  admin && admin._id === user._id ? "outline" : "default"
+                }
                 className="flex-1 mr-2"
               >
                 Send Message
@@ -198,7 +200,7 @@ function Page() {
                   <Fragment key={blocked._id}>
                     <MemberUser
                       member={blocked}
-                      isAdmin={admin._id === user._id}
+                      isAdmin={admin ? admin._id === user._id : false}
                     />
                   </Fragment>
                 ))
@@ -213,7 +215,7 @@ function Page() {
                   <Fragment key={blocked._id}>
                     <MemberUser
                       member={blocked}
-                      isAdmin={admin._id === user._id}
+                      isAdmin={admin ? admin._id === user._id : false}
                     />
                   </Fragment>
                 ))

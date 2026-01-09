@@ -3,16 +3,18 @@ import Message from "../models/messageModel";
 import Chat from "../models/chatModel";
 import User from "../models/userModel";
 import ErrorHandler from "../utils/ErrorHandler";
+import sendNotification from "../utils/sendNotification";
+import sendInfoMessage from "../utils/sendInfoMessage";
 
 const message = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
 
   let message: any = await Message.find({
     chat: chatId,
-    isDeleted: false,
     users: { $in: [req.user._id] },
   })
     .populate("sender", "-password")
+    .populate("recieverUser", "-password")
     .populate("chat")
     .populate("parentMessage");
 
@@ -49,6 +51,14 @@ const createMessage = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler("Chat not found", 404));
   }
 
+  if (chat.blockedChat) {
+    return next(new ErrorHandler("Cannot send message to a blocked chat", 403));
+  }
+
+  if (chat.users.indexOf(req.user._id) === -1) {
+    return next(new ErrorHandler("You are not a member of this chat", 403));
+  }
+
   let message: any = await Message.create({
     content,
     sender: req.user._id,
@@ -81,6 +91,8 @@ const createMessage = asyncHandler(async (req, res, next) => {
     }
   );
 
+  await sendNotification(req, message, false);
+
   res.json({
     success: true,
     message,
@@ -107,4 +119,18 @@ const deleteMessage = asyncHandler(async (req, res, next) => {
   });
 });
 
-export { createMessage, message, deleteMessage };
+const createInfoMessage = asyncHandler(async (req, res, next) => {
+  const { chatId, content, recieverUser } = req.body;
+  if (!chatId || !content) {
+    return next(new ErrorHandler("Invalid data passed into request", 400));
+  }
+
+  await sendInfoMessage(chatId, content, recieverUser, req, next);
+
+  res.json({
+    success: true,
+    message: req.body.message,
+  });
+});
+
+export { createMessage, message, deleteMessage, createInfoMessage };

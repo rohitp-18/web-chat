@@ -32,14 +32,12 @@ function ChatInfo() {
       socket?.emit("block user", {
         chatId: chat?._id,
         blockedBy: user,
-        chat,
         userId: otherUser?._id,
       });
     } else {
       dispatch(unblockChat(chat?._id || ""));
       socket?.emit("unblock user", {
         chatId: chat?._id,
-        chat,
         blockedBy: null,
         userId: otherUser?._id,
       });
@@ -94,9 +92,12 @@ function ChatInfo() {
           <Button asChild>
             <Link href={`/in/${otherUser.username}`}>View Profile</Link>
           </Button>
-          <Button disabled={loading} onClick={blockUser} variant={"outline"}>
-            {blocked ? "UnBlock User" : "Block User"}
-          </Button>
+          {(!chat.blockedChat ||
+            (chat.blockedBy && chat.blockedBy._id === user?._id)) && (
+            <Button disabled={loading} onClick={blockUser} variant={"outline"}>
+              {blocked ? "UnBlock User" : "Block User"}
+            </Button>
+          )}
         </div>
       </Box>
     </Box>

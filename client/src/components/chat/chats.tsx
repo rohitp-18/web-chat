@@ -94,10 +94,26 @@ const Chat = () => {
   const blockUserChat = () => {
     if (!chat) return;
     if (!chat.isGroup) {
-      if (chat.blockedChat) {
-        dispatch(unblockChat(chat._id));
+      if (!chat.blockedChat) {
+        dispatch(blockChat(chat?._id || ""));
+        socket?.emit("block user", {
+          chatId: chat?._id,
+          blockedBy: user,
+          userId:
+            chat.users[0]?._id === user?._id
+              ? chat.users[1]?._id
+              : chat.users[0]?._id,
+        });
       } else {
-        dispatch(blockChat(chat._id));
+        dispatch(unblockChat(chat?._id || ""));
+        socket?.emit("unblock user", {
+          chatId: chat?._id,
+          blockedBy: null,
+          userId:
+            chat.users[0]?._id === user?._id
+              ? chat.users[1]?._id
+              : chat.users[0]?._id,
+        });
       }
     }
   };
@@ -185,7 +201,7 @@ const Chat = () => {
           style={{
             background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
           }}
-          className="text-white p-4 flex items-center justify-between border-b h-[72px] border-black/5 shadow-lg"
+          className="text-white p-4 flex sticky top-0 left-0 items-center justify-between border-b h-[72px] border-black/5 shadow-lg"
         >
           <Box
             onClick={() => setUserInfo(true)}
@@ -193,7 +209,10 @@ const Chat = () => {
           >
             {isMobile && (
               <IconButton
-                onClick={() => dispatch(setChat(null))}
+                onClick={() => {
+                  dispatch(setChat(null));
+                  window.history.replaceState({}, "", "/chat");
+                }}
                 sx={{
                   color: "#fff",
                   mr: 1,
@@ -280,37 +299,38 @@ const Chat = () => {
               <DropdownMenuItem onClick={() => setUserInfo(true)}>
                 {chat.isGroup ? "Group Info" : "User Info"}
               </DropdownMenuItem>
-              {chat.isGroup ? (
-                !chat.group?.admins.includes(user._id) && (
-                  <>
-                    {chat.group?.members.includes(user._id) && (
-                      <DropdownMenuItem onClick={leaveHandler}>
-                        Leave Group
+              {chat.isGroup
+                ? !chat.group?.admins.includes(user._id) && (
+                    <>
+                      {chat.group?.members.includes(user._id) && (
+                        <DropdownMenuItem onClick={leaveHandler}>
+                          Leave Group
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        disabled={
+                          chat.group?.userBlocked.find((u) => u === user._id)
+                            ? true
+                            : false
+                        }
+                        onClick={
+                          chat.group?.userBlocked.includes(user._id)
+                            ? unblockHandler
+                            : blockGroupChat
+                        }
+                      >
+                        {chat.group?.userBlocked.find((u) => u === user._id)
+                          ? "Unblock Group"
+                          : "Block Group"}
                       </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      disabled={
-                        chat.group?.userBlocked.find((u) => u === user._id)
-                          ? true
-                          : false
-                      }
-                      onClick={
-                        chat.group?.userBlocked.includes(user._id)
-                          ? unblockHandler
-                          : blockGroupChat
-                      }
-                    >
-                      {chat.group?.userBlocked.find((u) => u === user._id)
-                        ? "Unblock Group"
-                        : "Block Group"}
+                    </>
+                  )
+                : (!chat.blockedChat ||
+                    (chat.blockedBy && chat.blockedBy._id === user?._id)) && (
+                    <DropdownMenuItem onClick={blockUserChat}>
+                      {chat.blockedChat ? "Unblock User" : "Block User"}
                     </DropdownMenuItem>
-                  </>
-                )
-              ) : (
-                <DropdownMenuItem onClick={blockUserChat}>
-                  {chat.blockedChat ? "Unblock User" : "Block User"}
-                </DropdownMenuItem>
-              )}
+                  )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

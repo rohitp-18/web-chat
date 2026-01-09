@@ -20,6 +20,10 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Chat",
     },
+    recieverUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     parentMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",

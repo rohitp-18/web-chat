@@ -8,17 +8,15 @@ import React, {
 import { io, Socket } from "socket.io-client";
 import { AppDispatch, RootState } from "../store";
 import { useDispatch, useSelector } from "react-redux";
-import { toast } from "sonner";
-// import {
-//   notificationT,
-//   updateChatNotifications,
-//   updateInvitations,
-//   updateNotificationCount,
-// } from "../user/notificationSlice";
-// import CustomNotification from "../../components/customNotification";
+import CustomNotification from "../../components/customNotification";
 import { chat, Message } from "../types/chatType";
 import { user } from "../types/userType";
-import { getAllChats, toggleBlockChat, updateChats } from "../chatSlice";
+import {
+  getAllChats,
+  toggleBlockChat,
+  updateChats,
+  updateChatUsers,
+} from "../chatSlice";
 
 interface SocketState {
   isConnected: boolean;
@@ -62,9 +60,8 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const [onlineUser, setOnlineUsers] = useState<Set<string>>(new Set());
   const [socket, setSocket] = useState<Socket | null>(null);
   const [chatCount, setChatCount] = useState(0);
-  // const [show, setShow] = useState(false);
-  // const [notificationData, setNotificationData] =
-  //   useState<notificationT | null>(null);
+  const [show, setShow] = useState(false);
+  const [messageData, setMessageData] = useState<Message | null>(null);
 
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.user);
@@ -87,11 +84,37 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
   async function handleNewMessage(newMessage: Message) {
     if (!selectedChat || selectedChat._id !== newMessage.chat._id) {
-      toast.message(newMessage.content, {
-        position: "bottom-right",
-      });
+      setShow(true);
+      setMessageData(newMessage);
       dispatch(updateChats({ _id: newMessage.chat._id, message: newMessage }));
+      setTimeout(() => {
+        setShow(false);
+        setMessageData(null);
+      }, 5000);
     }
+  }
+
+  async function receiveNotification(newMessage: Message) {
+    if (newMessage.sender._id === user?._id) return;
+    if (!selectedChat || selectedChat._id !== newMessage.chat._id) {
+      setShow(true);
+      setMessageData(newMessage);
+      setTimeout(() => {
+        setShow(false);
+        setMessageData(null);
+      }, 5000);
+    }
+  }
+
+  async function userUpdateInChat({
+    users,
+    _id,
+  }: {
+    users: user[];
+    _id: string;
+  }) {
+    console.log(users, _id);
+    dispatch(updateChatUsers({ _id, users }));
   }
 
   useEffect(() => {
@@ -244,6 +267,26 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [socket, dispatch]);
 
+  useEffect(() => {
+    if (!user || !socket) return;
+    socket.on("update_chat_users", userUpdateInChat);
+
+    return () => {
+      socket.off("update_chat_users", userUpdateInChat);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, user]);
+
+  useEffect(() => {
+    if (!user || !socket) return;
+    socket.on("receive_notification", receiveNotification);
+
+    return () => {
+      socket.off("receive_notification", receiveNotification);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, user]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -258,12 +301,9 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         onlineUser,
       }}
     >
-      {/* {show && notificationData && (
-        <CustomNotification
-          data={notificationData}
-          onClose={() => setShow(false)}
-        />
-      )} */}
+      {show && messageData && (
+        <CustomNotification data={messageData} onClose={() => setShow(false)} />
+      )}
       {children}
     </SocketContext.Provider>
   );

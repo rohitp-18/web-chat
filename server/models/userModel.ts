@@ -8,6 +8,7 @@ interface IUser extends mongoose.Document {
   password: string;
   username: string;
   about: string;
+  pushSubscription: any[];
   avatar: { url: string; public_id: string } | null;
   comparePassword(password: string): Promise<boolean>;
 }
@@ -33,6 +34,7 @@ const userSchema = new mongoose.Schema<IUser>({
   },
   password: {
     type: String,
+    select: false,
     required: [true, "Please enter your password"],
   },
   avatar: {
@@ -43,6 +45,7 @@ const userSchema = new mongoose.Schema<IUser>({
       type: String,
     },
   },
+  pushSubscription: [{ type: Object, select: false }],
 });
 
 userSchema.pre("save", async function () {

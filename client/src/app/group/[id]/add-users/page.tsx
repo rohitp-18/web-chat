@@ -112,7 +112,7 @@ function Page() {
 
   return (
     <ProtectRoute>
-      <Header chat={false} />
+      <Header hidden={false} />
       <div className="flex flex-col items-center gap-2 justify-center min-h-screen p-6 bg-linear-to-br from-blue-50 to-indigo-100">
         <Box className="mx-auto py-2 mt-20 min-w-64 border-0 outline-0 max-w-[90vw] md:max-w-[350px] bg-white rounded-lg shadow-xl flex flex-col justify-start items-start">
           <Box className="flex justify-center items-center p-4 gap-4">

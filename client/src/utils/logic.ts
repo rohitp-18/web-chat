@@ -11,7 +11,7 @@ const isSameSenderMargin = (
     messages[i + 1].sender._id === m.sender._id &&
     messages[i].sender._id !== userId
   ) {
-    if (isNewDay(messages, i + 1)) {
+    if (isNewDay(messages, i + 1) || isInfoMessage(messages, i)) {
       return 0;
     }
     return 40;
@@ -64,10 +64,15 @@ const isNewDay = (messages: Message[], i: number) => {
   );
 };
 
+const isInfoMessage = (messages: Message[], i: number) => {
+  return i + 1 < messages.length && messages[i + 1].isInfoMessage
+}
+
 export {
   isSameSender,
   isSameUser,
   isLastMessage,
   isSameSenderMargin,
   isNewDay,
+  isInfoMessage
 };

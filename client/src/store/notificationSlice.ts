@@ -1,94 +1,14 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "./axios";
-import { AxiosError, isAxiosError } from "axios";
 import handleError from "./handleError";
 import { user } from "./types/userType";
-
-const getAllNotifications = createAsyncThunk(
-  "notification/getallnotification",
-  async () => {
-    try {
-      const { data } = await axios.get("/notifications/all");
-
-      return data;
-    } catch (error: unknown | AxiosError) {
-      handleError(error);
-    }
-  }
-);
-
-const getAllInvitations = createAsyncThunk(
-  "notification/getallinvitations",
-  async () => {
-    try {
-      const { data } = await axios.get("/invitations/all");
-      return data;
-    } catch (error: unknown | AxiosError) {
-      handleError(error);
-    }
-  }
-);
-
-const getAllInvitationsCount = createAsyncThunk(
-  "notification/getallinvitationscount",
-  async () => {
-    try {
-      const { data } = await axios.get("/invitations/get/count");
-
-      return data;
-    } catch (error: unknown | AxiosError) {
-      handleError(error);
-    }
-  }
-);
-
-const readNotification = createAsyncThunk(
-  "notification/readNotification",
-  async (id: string) => {
-    try {
-      const { data } = await axios.get(`/notifications/read/${id}`);
-
-      return data;
-    } catch (error: unknown | AxiosError) {
-      handleError(error);
-    }
-  }
-);
-const readAllNotification = createAsyncThunk(
-  "notification/readAllNotification",
-  async () => {
-    try {
-      const { data } = await axios.get("/notifications/read/all");
-
-      return data;
-    } catch (error: unknown | AxiosError) {
-      handleError(error);
-    }
-  }
-);
-
-const deleteNotification = createAsyncThunk(
-  "notification/deleteNotification",
-  async (id: string) => {
-    try {
-      const { data } = await axios.delete(`/notifications/user/${id}`);
-
-      return data;
-    } catch (error: unknown | AxiosError) {
-      handleError(error);
-    }
-  }
-);
 
 const getKey = createAsyncThunk("notification/getKey", async () => {
   try {
     const { data } = await axios.get("/notifications/key");
     return data;
-  } catch (error: unknown | AxiosError) {
-    if (isAxiosError(error) && error.response) {
-      throw error.response.data.message;
-    }
-    throw (error as Error).message;
+  } catch (error) {
+    handleError(error);
   }
 });
 
@@ -100,7 +20,7 @@ const subscribeUser = createAsyncThunk(
         subscription,
       });
       return data;
-    } catch (error: unknown | AxiosError) {
+    } catch (error) {
       handleError(error);
     }
   }
@@ -114,7 +34,7 @@ const unSubscribeUser = createAsyncThunk(
         subscription,
       });
       return data;
-    } catch (error: unknown | AxiosError) {
+    } catch (error) {
       handleError(error);
     }
   }
@@ -131,6 +51,7 @@ interface notificationT {
   relatedId?: { avatar: { url: string }; name: string };
   createdAt: Date;
   updatedAt: Date;
+  content: string;
 }
 
 interface invitationT {
@@ -202,82 +123,13 @@ const notificationSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder
-      .addCase(getAllNotifications.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-        state.message = null;
-      })
-      .addCase(getAllNotifications.fulfilled, (state, action) => {
-        state.loading = false;
-        state.notifications = action.payload.notifications || [];
-        state.message = action.payload.message || null;
-        state.error = null;
-      })
-      .addCase(getAllNotifications.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || "Failed to fetch notifications";
-      })
-
-      // delete notification
-      .addCase(deleteNotification.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-        state.message = null;
-        state.deleted = false;
-      })
-      .addCase(deleteNotification.fulfilled, (state, action) => {
-        state.loading = false;
-        state.deleted = true;
-        state.message = action.payload.message || "Notification deleted";
-        state.error = null;
-        state.notifications = state.notifications.filter(
-          (n) => n._id !== action.payload.notificationId
-        );
-      })
-      .addCase(deleteNotification.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || "Failed to delete notification";
-        state.deleted = false;
-      })
-
-      .addCase(getKey.fulfilled, (state, action) => {
-        state.key = action.payload.key;
-      })
-
-      .addCase(getAllInvitations.fulfilled, (state, action) => {
-        state.invitations = action.payload.invitations || [];
-        state.totalInvitations = 0;
-      })
-      .addCase(getAllInvitations.rejected, (state, action) => {
-        state.error = action.error.message || "Failed to fetch invitations";
-      })
-      .addCase(getAllInvitationsCount.fulfilled, (state, action) => {
-        state.totalInvitations = action.payload.count || 0;
-        state.totalNotifications = action.payload.totalNotifications || 0;
-        state.totalChats = action.payload.totalChats || 0;
-      })
-
-      .addCase(readNotification.fulfilled, (state, action) => {
-        state.totalNotifications = state.totalNotifications - 1;
-        state.notifications = state.notifications.map((notify) => {
-          if (notify._id != action.payload.notification._id) {
-            notify.read = true;
-          }
-          return notify;
-        });
-      })
-      .addCase(readAllNotification.fulfilled, (state, action) => {
-        state.totalNotifications = 0;
-        state.notifications = state.notifications.map((notify) => {
-          notify.read = true;
-          return notify;
-        });
-      });
+    builder.addCase(getKey.fulfilled, (state, action) => {
+      state.key = action.payload.key;
+    });
   },
 });
 
-const {
+export const {
   resetNotification,
   clearError,
   updateInvitations,
@@ -285,21 +137,6 @@ const {
   updateNotificationCount,
 } = notificationSlice.actions;
 
-export {
-  resetNotification,
-  clearError,
-  getAllNotifications,
-  deleteNotification,
-  getKey,
-  subscribeUser,
-  getAllInvitations,
-  getAllInvitationsCount,
-  updateInvitations,
-  updateChatNotifications,
-  updateNotificationCount,
-  unSubscribeUser,
-  readAllNotification,
-  readNotification,
-};
+export { getKey, subscribeUser, unSubscribeUser };
 export type { notificationT };
 export default notificationSlice.reducer;

@@ -5,9 +5,11 @@ import { v2 as cloudinary } from "cloudinary";
 import expressAsyncHandler from "express-async-handler";
 import { Types } from "mongoose";
 import Chat from "../models/chatModel";
+import sendInfoMessage from "../utils/sendInfoMessage";
+import User from "../models/userModel";
+import { io, onlineUsers } from "../socket";
 
 const createGroup = expressAsyncHandler(async (req, res, next) => {
-  console.log(req.body, req.file);
   const { name, username, about, members } = req.body;
 
   if (!name || !username) {
@@ -68,6 +70,8 @@ const createGroup = expressAsyncHandler(async (req, res, next) => {
   }
 
   await group.save();
+
+  await sendInfoMessage(chat._id.toString(), `${req.user.name} created the group`, null, req, next);
 
   res.status(201).json({
     success: true,
@@ -136,6 +140,13 @@ const leaveGroup = expressAsyncHandler(
     if (!group.members.includes(req.user._id)) {
       return next(new ErrorHandler("You are not a member of this group", 400));
     }
+    const chat = await Chat.findOne({ group: group._id });
+    if (!chat) {
+      return next(new ErrorHandler("Associated chat not found", 404));
+    }
+
+    await sendInfoMessage(chat._id.toString(), `${req.user.name} left the group`, null, req, next);
+
 
     group.members = group.members.filter(
       (memberId) => memberId.toString() !== req.user._id.toString()
@@ -147,7 +158,7 @@ const leaveGroup = expressAsyncHandler(
       (adminId) => adminId.toString() !== req.user._id.toString()
     );
 
-    const chat = await Chat.findOne({ group: group._id });
+
     if (chat) {
       chat.users = chat.users.filter(
         (userId) => userId.toString() !== req.user._id.toString()
@@ -155,8 +166,15 @@ const leaveGroup = expressAsyncHandler(
       chat.oldUsers.push(req.user._id);
       await chat.save();
     }
-
     await group.save();
+
+
+    if (onlineUsers.has(req.user._id.toString())) {
+      const socketId = onlineUsers.get(req.user._id.toString())
+      if (socketId) {
+        io.to(socketId).emit("update_chat_users", { _id: chat._id, users: chat.users });
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -168,6 +186,11 @@ const leaveGroup = expressAsyncHandler(
 const adminBlockUser = expressAsyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { userId } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
 
     const group = await Group.findById(req.params.groupId);
 
@@ -193,6 +216,13 @@ const adminBlockUser = expressAsyncHandler(
     );
 
     const chat = await Chat.findOne({ group: group._id });
+
+    if (!chat) {
+      return next(new ErrorHandler("Associated chat not found", 404));
+    }
+
+    await sendInfoMessage(chat!._id.toString(), ` ${user.name} has been blocked by admin`, userId, req, next);
+
     if (chat) {
       chat.users = chat.users.filter(
         (memberId) => memberId.toString() !== userId.toString()
@@ -201,6 +231,13 @@ const adminBlockUser = expressAsyncHandler(
       await chat.save();
     }
     await group.save();
+
+    if (onlineUsers.has(userId)) {
+      const socketId = onlineUsers.get(userId)
+      if (socketId) {
+        io.to(socketId).emit("update_chat_users", { _id: chat._id, users: chat.users });
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -229,14 +266,26 @@ const userBlockGroup = expressAsyncHandler(
     );
 
     const chat = await Chat.findOne({ group: group._id });
-    if (chat) {
-      chat.users = chat.users.filter(
-        (memberId) => memberId.toString() !== req.user._id.toString()
-      );
-      chat.oldUsers.push(req.user._id);
-      await chat.save();
+    if (!chat) {
+      return next(new ErrorHandler("Associated chat not found", 404));
     }
+
+    await sendInfoMessage(chat!._id.toString(), `${req.user.name} has left the group`, null, req, next);
+
+    chat.users = chat.users.filter(
+      (memberId) => memberId.toString() !== req.user._id.toString()
+    );
+    chat.oldUsers.push(req.user._id);
+    await chat.save();
     await group.save();
+
+    if (onlineUsers.has(req.user._id.toString())) {
+      const socketId = onlineUsers.get(req.user._id.toString())
+      if (socketId) {
+        io.to(socketId).emit("update_chat_users", { _id: chat._id, users: chat.users });
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: "Group blocked successfully",
@@ -263,6 +312,11 @@ const userUnblockGroup = expressAsyncHandler(
     group.members.push(req.user._id);
 
     const chat = await Chat.findOne({ group: group._id });
+
+    if (!chat) {
+      return next(new ErrorHandler("Associated chat not found", 404));
+    }
+
     if (chat) {
       chat.users.push(req.user._id);
       chat.oldUsers = chat.oldUsers.filter(
@@ -271,6 +325,16 @@ const userUnblockGroup = expressAsyncHandler(
       await chat.save();
     }
     await group.save();
+    await sendInfoMessage(chat!._id.toString(), `${req.user.name} has rejoined the group`, null, req, next);
+
+
+    if (onlineUsers.has(req.user._id.toString())) {
+      const socketId = onlineUsers.get(req.user._id.toString())
+      if (socketId) {
+        io.to(socketId).emit("update_chat_users", { _id: chat._id, users: chat.users });
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: "Group unblocked successfully",
@@ -281,6 +345,12 @@ const userUnblockGroup = expressAsyncHandler(
 const adminUnblockUser = expressAsyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { userId } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
     const group = await Group.findById(req.params.groupId);
 
     if (!group) {
@@ -296,12 +366,16 @@ const adminUnblockUser = expressAsyncHandler(
     if (!group.blockedMembers.includes(userId)) {
       return next(new ErrorHandler("User is not blocked", 400));
     }
+
+    const chat = await Chat.findOne({ group: group._id });
+    if (!chat) {
+      return next(new ErrorHandler("Associated chat not found", 404));
+    }
+
     group.blockedMembers = group.blockedMembers.filter(
       (memberId) => memberId.toString() !== userId.toString()
     );
     group.members.push(new Types.ObjectId(userId));
-
-    const chat = await Chat.findOne({ group: group._id });
     if (chat) {
       chat.users.push(new Types.ObjectId(userId));
       chat.oldUsers = chat.oldUsers.filter(
@@ -310,6 +384,15 @@ const adminUnblockUser = expressAsyncHandler(
       await chat.save();
     }
     await group.save();
+
+    await sendInfoMessage(chat!._id.toString(), `${user.name} has been unblocked by admin`, userId, req, next);
+
+    if (onlineUsers.has(userId)) {
+      const socketId = onlineUsers.get(userId)
+      if (socketId) {
+        io.to(socketId).emit("update_chat_users", { _id: chat._id, users: chat.users });
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -321,6 +404,12 @@ const adminUnblockUser = expressAsyncHandler(
 const addUsersToGroup = expressAsyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { userIds } = req.body;
+
+    const users = await User.find({ _id: { $in: userIds } });
+    if (users.length !== userIds.length) {
+      return next(new ErrorHandler("One or more users not found", 404));
+    }
+
     const group = await Group.findById(req.params.groupId);
     if (!group) {
       return next(new ErrorHandler("Group not found", 404));
@@ -350,6 +439,21 @@ const addUsersToGroup = expressAsyncHandler(
 
     await group.save();
 
+    await Promise.all(
+      users.map(async (user) => {
+        await sendInfoMessage(chat._id.toString(), `${user.name} has been added to the group`, user._id.toString(), req, next);
+      })
+    );
+
+    users.map((user) => {
+      if (onlineUsers.has(user._id.toString())) {
+        const socketId = onlineUsers.get(user._id.toString())
+        if (socketId) {
+          io.to(socketId).emit("update_chat_users", { _id: chat._id, users: chat.users });
+        }
+      }
+    })
+
     res.status(200).json({
       success: true,
       message: "Users added to group successfully",
@@ -360,6 +464,12 @@ const addUsersToGroup = expressAsyncHandler(
 const removeUsersFromGroup = expressAsyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { userIds } = req.body;
+
+    const users = await User.find({ _id: { $in: userIds } });
+    if (users.length !== userIds.length) {
+      return next(new ErrorHandler("One or more users not found", 404));
+    }
+
     const group = await Group.findById(req.params.groupId);
     if (!group) {
       return next(new ErrorHandler("Group not found", 404));
@@ -378,6 +488,12 @@ const removeUsersFromGroup = expressAsyncHandler(
       return next(new ErrorHandler("Associated chat not found", 404));
     }
 
+    await Promise.all(
+      users.map(async (user) => {
+        await sendInfoMessage(chat!._id.toString(), `${user.name} has been removed from the group`, user._id.toString(), req, next);
+      })
+    );
+
     chat.users = chat.users.filter(
       (memberId) => !userIds.includes(memberId.toString())
     );
@@ -393,6 +509,16 @@ const removeUsersFromGroup = expressAsyncHandler(
     await chat.save();
 
     await group.save();
+
+    users.map((user) => {
+      if (onlineUsers.has(user._id.toString())) {
+        const socketId = onlineUsers.get(user._id.toString())
+        if (socketId) {
+          io.to(socketId).emit("update_chat_users", { _id: chat._id, users: chat.users });
+        }
+      }
+    })
+
     res.status(200).json({
       success: true,
       message: "Users removed from group successfully",

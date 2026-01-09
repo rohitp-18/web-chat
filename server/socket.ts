@@ -10,10 +10,8 @@ function setupSocket(server: HttpServer): void {
   io = new Server(server, {
     pingTimeout: 60000,
     cors: {
-      origin: [
-        "http://localhost:3000/",
-        "http://localhost/",
-        "https://relievingly-noncongratulatory-micheline.ngrok-free.dev/",
+      origin: ["http://localhost:3000/",
+        process.env.HOST_URL || "",
       ],
       methods: ["GET", "POST"],
     },

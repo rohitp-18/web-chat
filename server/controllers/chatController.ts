@@ -3,6 +3,7 @@ import Chat from "../models/chatModel";
 import User from "../models/userModel";
 import ErrorHandler from "../utils/ErrorHandler";
 import Message from "../models/messageModel";
+import sendInfoMessage from "../utils/sendInfoMessage";
 
 const getChats = asyncHandler(async (req, res, next) => {
   const { userId } = req.body;
@@ -81,6 +82,30 @@ const fetchChats = asyncHandler(async (req, res, next) => {
 
 const blockChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.body;
+  const tempChat = await Chat.findById(
+    chatId
+  ).populate("blockedBy", "-password");
+
+  if (!tempChat) {
+    return next(new ErrorHandler("Chat not found", 404));
+  }
+
+  if (tempChat.blockedChat) {
+    return next(new ErrorHandler("Chat already blocked", 400));
+  }
+
+  try {
+    await sendInfoMessage(
+      chatId,
+      `${req.user.name} have blocked this chat.`,
+      tempChat.users[0]._id.toString() === req.user._id.toString() ? tempChat.users[1]._id.toString() : tempChat.users[0]._id.toString(),
+      req,
+      next
+    )
+  } catch (error) {
+    console.log(error)
+  };
+
   const chat = await Chat.findByIdAndUpdate(
     chatId,
     { blockedChat: true, blockedBy: req.user._id, blockedAt: Date.now() },
@@ -99,15 +124,39 @@ const blockChat = asyncHandler(async (req, res, next) => {
 
 const unblockChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.body;
+  const tempChat = await Chat.findById(
+    chatId
+  );
+
+  if (!tempChat) {
+    return next(new ErrorHandler("Chat not found", 404));
+  }
+
+  if (!tempChat.blockedChat) {
+    return next(new ErrorHandler("Chat is not blocked", 400));
+  }
+
+  if (tempChat.blockedBy?.toString() !== req.user._id.toString()) {
+    return next(new ErrorHandler("You are not authorized to unblock this chat", 403));
+  }
+
+  try {
+    await sendInfoMessage(
+      chatId,
+      `${req.user.name} have unblocked this chat.`,
+      tempChat.users[0]._id.toString() === req.user._id.toString() ? tempChat.users[1]._id.toString() : tempChat.users[0]._id.toString(),
+      req,
+      next
+    );
+  } catch (error) {
+    console.log(error)
+  }
+
   const chat = await Chat.findByIdAndUpdate(
     chatId,
     { blockedChat: false, blockedBy: null, blockedAt: null },
     { new: true }
-  );
-
-  if (!chat) {
-    return next(new ErrorHandler("Chat not found", 404));
-  }
+  ).populate("blockedBy", "-password");
 
   res.status(200).json({
     success: true,

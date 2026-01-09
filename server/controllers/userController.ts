@@ -41,7 +41,7 @@ const loginUser = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler("please fill all the required fields", 400));
   }
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email }).select("password");
 
   if (!user) {
     return next(new ErrorHandler("Invalid Email and Password", 402));

@@ -51,7 +51,7 @@ const Login = () => {
   }, [user, success, router]);
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 flex items-center justify-center sm:p-4 p-2">
       {loading ? (
         <div className="bg-white rounded-lg shadow-lg p-8 flex items-center space-x-3">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
@@ -59,7 +59,7 @@ const Login = () => {
         </div>
       ) : (
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="bg-white rounded-2xl shadow-xl md:p-8 sm:p-6 p-4 py-8">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Welcome Back
@@ -67,7 +67,10 @@ const Login = () => {
               <p className="text-gray-600">Sign in to your account</p>
             </div>
 
-            <form onSubmit={(e) => loginHandler(e)} className="space-y-6 p-3">
+            <form
+              onSubmit={(e) => loginHandler(e)}
+              className="space-y-6 sm:p-3 py-3"
+            >
               <div className="space-y-4">
                 <div>
                   <label
