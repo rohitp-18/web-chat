@@ -152,7 +152,7 @@ web-chat/
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/rohitp-18/web-chat.git
    cd web-chat
    ```
 
@@ -186,13 +186,13 @@ web-chat/
    VAPID_PUBLIC_KEY=your_vapid_public_key
    VAPID_PRIVATE_KEY=your_vapid_private_key
 
-   PORT=4000
+   PORT=5000
    ```
 
 4. **Setup Client**
 
    ```bash
-   cd ../client
+   cd client
    npm install
    ```
 
@@ -204,7 +204,7 @@ web-chat/
    npm run server
    ```
 
-   Server will run on `http://localhost:4000`
+   Server will run on `http://localhost:5000`
 
    **Terminal 2 - Start the client:**
 
@@ -228,37 +228,61 @@ web-chat/
 - `FRONTEND_URL` - Frontend application URL
 - `VAPID_PUBLIC_KEY` - Web push public key
 - `VAPID_PRIVATE_KEY` - Web push private key
-- `PORT` - Server port (default: 4000)
+- `PORT` - Server port (default: 5000)
 
 ## API Endpoints
 
 ### User Routes
 
-- `POST /user/register` - Register new user
-- `POST /user/login` - Login user
-- `GET /user/logout` - Logout user
-- `GET /user/me` - Get current user profile
-- `PUT /user/update` - Update user profile
-- `PUT /user/change-password` - Change password
-- `GET /user/username-status` - Check username availability
+| Method | Endpoint                       | Description                 |
+| ------ | ------------------------------ | --------------------------- |
+| POST   | `/api/v1/user/register`        | Register new user           |
+| POST   | `/api/v1/user/login`           | Login user                  |
+| GET    | `/api/v1/user/logout`          | Logout user                 |
+| GET    | `/api/v1/user/me`              | Get current user profile    |
+| PUT    | `/api/v1/user/update`          | Update user profile         |
+| PUT    | `/api/v1/user/change-password` | Change password             |
+| GET    | `/api/v1/user/username-status` | Check username availability |
 
 ### Chat Routes
 
-- `GET /chat/all` - Get all user chats
-- `POST /chat/create-group` - Create new group
-- `GET /chat/:id` - Get chat details
-- `PUT /chat/:id` - Update chat/group
+| Method | Endpoint                    | Description        |
+| ------ | --------------------------- | ------------------ |
+| GET    | `/api/v1/chat/all`          | Get all user chats |
+| POST   | `/api/v1/chat/create-group` | Create new group   |
+| GET    | `/api/v1/chat/:id`          | Get chat details   |
+| PUT    | `/api/v1/chat/:id`          | Update chat/group  |
+
+### Group Routes
+
+| Method | Endpoint                                    | Description               |
+| ------ | ------------------------------------------- | ------------------------- |
+| POST   | `/api/v1/group`                             | Create new group          |
+| GET    | `/api/v1/group/:groupId`                    | Get group details         |
+| PUT    | `/api/v1/group/:groupId`                    | Update group information  |
+| POST   | `/api/v1/group/:groupId/leave`              | Leave group               |
+| POST   | `/api/v1/group/:groupId/add-users`          | Add users to group        |
+| POST   | `/api/v1/group/:groupId/remove-users`       | Remove users from group   |
+| POST   | `/api/v1/group/:groupId/admin/toggle-admin` | Toggle admin status       |
+| POST   | `/api/v1/group/:groupId/admin/block-user`   | Block user (admin only)   |
+| POST   | `/api/v1/group/:groupId/admin/unblock-user` | Unblock user (admin only) |
+| POST   | `/api/v1/group/:groupId/user/block-group`   | User blocks group         |
+| POST   | `/api/v1/group/:groupId/user/unblock-group` | User unblocks group       |
 
 ### Message Routes
 
-- `POST /message/send` - Send message
-- `GET /message/:chatId` - Get messages for chat
-- `DELETE /message/:id` - Delete message
+| Method | Endpoint                  | Description           |
+| ------ | ------------------------- | --------------------- |
+| POST   | `/api/v1/message/send`    | Send message          |
+| GET    | `/api/v1/message/:chatId` | Get messages for chat |
+| DELETE | `/api/v1/message/:id`     | Delete message        |
 
 ### Notification Routes
 
-- `GET /notification/all` - Get all notifications
-- `PUT /notification/:id/read` - Mark notification as read
+| Method | Endpoint                        | Description               |
+| ------ | ------------------------------- | ------------------------- |
+| GET    | `/api/v1/notification/all`      | Get all notifications     |
+| PUT    | `/api/v1/notification/:id/read` | Mark notification as read |
 
 ## Usage
 

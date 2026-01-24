@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  webchat-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+
+    image: webchat-backend:latest
+    container_name: webchat-backend
+    restart: always
+    environment:
+      - PORT=5000
+
+    ports:
+      - "${PORT}:${PORT}"
+
+    networks:
+      - web-net
+
+  webchat-frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+
+    image: webchat-frontend:latest
+    container_name: webchat-frontend
+
+    restart: always
+    environment:
+      - PORT=3000
+
+    ports:
+      - "${PORT}:${PORT}"
+
+    networks:
+      - web-net
+
+networks:
+  web-net:
+    external: true
